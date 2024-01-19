@@ -93,7 +93,7 @@ output:
 
 -   note
 
-### Identification of ATE with OLS Regression 
+### Identification of ATE with OLS Regression
 
 -   recall unbiasdness from OLS
     -   taking the mean of multiple unbiased estimated should reveal an estimate that's close to the true population parameter
