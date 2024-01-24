@@ -38,7 +38,7 @@ options(scipen=999)
 
 # Part 1
 
-(NOTE: Uses the RCT.R code provided with lecture to generate data) DO NOT CHANGE ANYTHING BELOW UNTIL IT SAYS EXPLICITLY
+(NOTE: Uses the RCT.R code provided with lecture to generate data) DO NOT CHANGE ANYTHING BELOW UNTIL IT SAYS EXPLICITLY)
 
 ```{r , include=FALSE}
 
@@ -75,7 +75,7 @@ df <- data.frame(Xi, Yi_0, Yi_1)
 a)  Create equally sized treatment and control groups by creating a binary random variable Di where the units with the "1's" are chosen randomly.
 
     ```{r}
-    # set seed to 
+    # set seed to keep random column the same every time code runs
     set.seed(123)
 
     # calculate 1/2 the population
@@ -97,34 +97,68 @@ b)  Make two separate histograms of Xi for the treatment and control group. What
         c("0" = "Control (Di = 0)",
           "1" = "Treatment (Di = 1)"))) +
       scale_fill_binned(high = 'maroon', low = 'dodgerblue') +
-      guides(fill = 'none')
+      guides(fill = 'none') 
 
     ```
 
+    **ANS:** The histogram displays the expected results, there is a relatively even distribution between the treatment and control groups. Both groups also have an even number of units.
+
 c)  Test whether Di is uncorrelated with the pre-treatment characteristic Xi and report your finding.
+
+    ```{r}
+    # print correlation results 
+    cor.test(df$Di, Xi)
+    ```
+
+    **ANS:** The correlation value between $D_i$ and $X_i$ is a very small, and the p-value is large, so we fail to reject the null hypothesis that the true correlation is equal to 0. In other words, $D_i$ is uncorrelated with the pre-treatment characteristic $X_i$.
 
 d)  Test whether Di is uncorrelated with the potential outcomes Yi_0 and Yi_1 and report your finding (only possible for this synthetic dataset where we know all potential outcomes).
 
+    ```{r}
+    cor.test(df$Di, df$Yi_0)
+    cor.test(df$Di, df$Yi_1)
+    ```
+
+    **ANS:** The correlation between $D_i$ and $Y_{i0}$ is slightly stronger compared to $Y_{i1}$, but overall there is no correlation between treatment ($D_i$) and $Y_{i0}$ or $Y_{i1}$.
+
 e)  Estimate the ATE by comparing mean outcomes for treatment and control group. Test for mean difference between the groups and report your findings.
 
-f)  Estimate the ATE using a simple regression of (i) Yi on Di and (ii) Yi on Di and Xi and report your findings and include.
+    ```{r}
+    df %>% summarise(ATE = mean(Yi_1 - Yi_0))
+    ```
+
+f)  Estimate the ATE using a simple regression of (i) Yi on Di and (ii) Yi on Di and Xi and report your findings.
+
+    ```{r}
+    # create a Yi column that will be used for the regressions
+    df <- df %>% 
+      mutate(Yi = (Di*Yi_1+(1-Di)*Yi_0))
+
+    # regression of Yi on Di
+    lm(Yi~Di, data = df)
+
+    # regression of Yi on Di and Xi
+    lm(Yi ~ Di + Xi, data = df)
+    ```
 
 \newpage
 
 # Part 2
 
-\indent **Part 2** is based on Gertler, Martinez, and Rubio-Codina (2012) (article provided on canvas) and covers impact evaluation of the Mexican conditional cash transfer Progresa (later called Oportunidades, now Prospera). Basically, families with low-incomes received cash benefits if they complied to certain conditions, such as regular school attendance for children and regular healthcare visits. You can read more about the program in the Boxes 2.1 (p.10) & 3.1 (p.40) of the Handbook on impact evaluation: quantitative methods and practices by Khandker, B. Koolwal, and Samad (2010). The program followed a randomized phase-in design. You have data on households (hh) from 1999, when treatment hh have been receiving benefits for a year and control hh have not yet received any benefits. You can find a description of the variables at the end of the assignment. Again, briefly report what you find or respond to the questions.
+\indent \*\*Part 2\*\* is based on Gertler, Martinez, and Rubio-Codina (2012) (article provided on canvas) and covers impact evaluation of the Mexican conditional cash transfer Progresa (later called Oportunidades, now Prospera). Basically, families with low-incomes received cash benefits if they complied to certain conditions, such as regular school attendance for children and regular healthcare visits. You can read more about the program in the Boxes 2.1 (p.10) & 3.1 (p.40) of the Handbook on impact evaluation: quantitative methods and practices by Khandker, B. Koolwal, and Samad (2010). The program followed a randomized phase-in design. **You have data on households (hh) from 1999, when treatment hh have been receiving benefits for a year and control hh have not yet received any benefits.** You can find a description of the variables at the end of the assignment. Again, briefly report what you find or respond to the questions.
 
 ```{r , include=FALSE}
-
 # Load the dataset
-progresa <- read.csv("progresa.csv")
+progresa <- read_csv("data/hw-1-data.csv")
 
+# change NAs in treatment col to 0
+progresa$treatment[is.na(progresa$treatment)] <- 0
 ```
 
-a)  Some variables in the dataset were collected in 1997 before treatment began. Use these variables to test whether there are systematic differences between the control and the treatment group before the cash transfer began (i.e. test for systematic differences on all 1997 variables). Describe your results. Does it matter whether there are systematic differences? Why or why not? Would it be a mistake to do the same test with these variables if they were collected after treatment began and if so why? Note: If your variable is a proportion (e.g. binary variables), you should use a proportions test, otherwise you can use a t-test.
+a)  Some variables in the dataset were collected in 1997 before treatment began. **Use these variables to test whether there are systematic differences between the control and the treatment group before the cash transfer began (i.e. test for systematic differences on all 1997 variables).** Describe your results. Does it matter whether there are systematic differences? Why or why not? Would it be a mistake to do the same test with these variables if they were collected after treatment began and if so why? Note: If your variable is a proportion (e.g. binary variables), you should use a proportions test, otherwise you can use a t-test.
 
 ```{r , include=FALSE}
+
 ## For continuous variables you can use the t-test
 #t.test()
 
@@ -133,13 +167,58 @@ a)  Some variables in the dataset were collected in 1997 before treatment began.
 
 ```
 
+```{r}
+# creating subsets for control/treatment groups
+control <- progresa %>% 
+  filter(treatment == 0)
+treated <- progresa %>% 
+  filter(treatment == 1)
+
+# continuous variables (t.test)
+t.test(hhsize97 ~ treatment, data = progresa)
+t.test(vani ~ treatment, data = progresa)
+t.test(vani1 ~ treatment, data = progresa)
+t.test(vani2 ~ treatment, data = progresa)
+
+# binary variables (proportion test)
+a <- table(progresa$treatment, progresa$dirtfloor97)[, c(2,1)]
+
+```
+
 b)  Estimate the impact of program participation on the household's value of animal holdings (vani) using a simple univariate regression. Interpret the intercept and the coefficient. Is this an estimate of a treatment effect?
+
+    ```{r}
+    vani_model <- lm(vani ~ treatment, data = progresa)
+    summary(vani_model)
+    ```
+
+    **ANS:**
 
 c)  Now, include at least 6 independent control variables in your regression. How does the impact of program participation change? Choose one of your other control variables and interpret the coefficient.
 
-d)  The dataset also contains a variable intention_to_treat. This variable identifies eligible households in participating villages. Most of these households ended up in the treatment group receiving the cash transfer, but some did not. Test if the program has an effect on the value of animal holdings of these non-participants (spillover effects). Think of a reason why there might or might not be spillover effects.
+    ```{r}
+    lm(vani ~ treatment + age_hh + educ_hh + ethnicity_hh + healthcenter + min_dist + hairrigation, data = progresa)
+    ```
 
-\noindent Hint: Create a pseudo-treatment variable that is = 1 for individuals who were intended to get treatment but did not receive it, = 0 for the normal control group and excludes the normal treatment group.
+    **ANS:**
+
+d)  The dataset also contains a variable `intention_to_treat`. This variable identifies eligible households in participating villages. Most of these households ended up in the treatment group receiving the cash transfer, but some did not. Test if the program has an effect on the value of animal holdings of these non-participants (spillover effects). Think of a reason why there might or might not be spillover effects.
+
+    ```{r}
+    # find individuals that qualified for AND recieved treatment (1,1)
+    table(treatment = progresa$treatment, 
+          int_to_treat = progresa$intention_to_treat, exclude = NULL)
+
+    # new treatment variable
+    progresa$pseudo_treatment <- ifelse(progresa$intention_to_treat == 1 & progresa$treatment == 0,
+                       1, 0)
+
+    # test 
+    summary(lm(vani ~ pseudo_treatment, data = progresa))
+
+    ```
+
+\noindent **Hint**: Create a pseudo-treatment variable that is = 1 for individuals who were intended to get treatment but did not receive it, = 0 for the normal control group and excludes the normal treatment group.
 
 ```{r , include=FALSE}
 # Examine number of hh that were intended to get treatment and that ended up receiving treatment
@@ -159,86 +238,3 @@ progresa$pseudo_treatment[] <- 0
 ```
 
 \newpage
-
-# Mock Assignment, examples for you to use. Do not include in final submission
-
-\noindent In this mock assignment, we use the preloaded \`\`mtcars" data in R to investigate the relationship between vehicle miles per gallon (MPG), weight, and number of cylinders. The data was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973--74 models).
-
-# Clean and plot data
-
-\noindent The following code loads and cleans the data.
-
-```{r , include=TRUE}
-
-# Load data
-
-data("mtcars")
-raw_data <- mtcars
-
-# Clean data
-
-## Add model names as a column 
-## [this is just an example manipulation, I rarely assign rownames to a column]
-
-clean_data <- tibble::rownames_to_column(raw_data, "model")
-
-
-```
-
-\noindent The code chunk below shows how to produce a scatter plot of MPG against weight.
-
-```{r , include=TRUE}
-
-# Plot 1
-
-plot_1 <- ggplot(clean_data, aes(y=mpg, x = wt))+
-  geom_point()+
-  theme_cowplot(14)+
-  labs(x = "Weight (1000 lbs)", y = "Miles per gallon")
-
-```
-
-\newpage
-
-<center>**Figure 1: MPG and vehicle weight**</center>
-
-```{r , fig.width = 4, fig.height = 3, eval=TRUE, echo=FALSE}
-plot_1
-```
-
-\noindent Figure 1 shows the expected negative relationship between vehicle weight and MPG.
-
-# Run and interpret regression models
-
-\noindent In order to more formally analyze the relationship between MPG, vehicle weight, and cylinders we estimate the following regression:
-
-```{=tex}
-\begin{align}
-  Y_{i} = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + u_{i}
-\end{align}
-```
-\noindent where $Y_{i}$ is MPG for vehicle model $i$, $X_{1i}$ is the vehicle weight, $X_{2i}$ is the number of cylinders in the engine, and $u_{i}$ the regression error term. We will consider a regression including only vehicle weight, and a regression including vehicle weight and number of cylinders.
-
-\medskip
-
-\noindent In R, we run the following code:
-
-```{r , include=TRUE}
-
-model_1 <- lm(mpg ~ wt, data=clean_data)
-model_2 <- lm(mpg ~ wt + cyl, data=clean_data)
-
-```
-
-\noindent Table 1 shows the estimated coefficients from estimating equation (1).
-
-```{r , results = 'asis', echo = FALSE}
-stargazer(model_1, model_2, type = "latex", ci=FALSE, no.space = TRUE, 
-          header = FALSE, omit = c("Constant"), omit.stat = c("adj.rsq","ser", "f"),
-          covariate.labels = c("Weight (1000 lbs)", "Cylinders"), dep.var.labels = c("MPG"),
-          dep.var.caption = c(""),
-          title = "MPG and vehicle weight", table.placement = "H")
-
-```
-
-\noindent In model (1), the estimated $\beta_{1}$ coefficient implies that a 1000 pound increase in vehicle weight reduces miles per gallon by 5.3 miles. Adding the number of cylinders in model (2) reduces $\hat{\beta_{1}}$ from -5.3 to -3.2.
