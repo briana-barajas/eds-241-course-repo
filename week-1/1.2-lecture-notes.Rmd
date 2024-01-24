@@ -17,7 +17,7 @@ output:
 -   **treatments** are applied to a unit at a given point in time
     -   **unit** can be a person, location, firm, classroom, market, etc.
         -   a single unit is selected from the population, and is selected to be treated or NOT treated
-    -   based on this definitoin, the same person/location at a different point in time, is a different **unit**
+    -   based on this definition, the same person/location at a different point in time, is a different **unit**
     -   Examples
         -   implementing MPAs
         -   attending college
@@ -38,7 +38,7 @@ output:
 
 -   **counterfactual** - hypothetical unobserved value
     -   in other words, outcome if the unit got the alternative treatment
-    -   this class is about the validity of the counterfactual that we choose
+    -   this class is about the validity of the counter factual that we choose
 -   note
 
 ## SUTVA and Observed Outcomes
@@ -85,7 +85,7 @@ output:
 
 -   the $ATE$ model can be re-written to be equivalent to a linear regression equation
 
-    ![](ate-to-regrssion.png){width="410"}
+    ![](ate-to-regrssion.png){width="310"}
 
 -   you can't use a simple regression to calculate ${\beta_1}_i$
 
