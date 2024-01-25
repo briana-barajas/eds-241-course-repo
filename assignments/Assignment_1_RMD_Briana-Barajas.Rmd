@@ -127,6 +127,8 @@ e)  Estimate the ATE by comparing mean outcomes for treatment and control group.
     df %>% summarise(ATE = mean(Yi_1 - Yi_0))
     ```
 
+    **ANS:** The average treatment effect (ATE) was approximately 1.5. In this hypothetical, the ATE does not have units, although we do see there's some positive affect on the control group.
+
 f)  Estimate the ATE using a simple regression of (i) Yi on Di and (ii) Yi on Di and Xi and report your findings.
 
     ```{r}
@@ -139,7 +141,10 @@ f)  Estimate the ATE using a simple regression of (i) Yi on Di and (ii) Yi on Di
 
     # regression of Yi on Di and Xi
     lm(Yi ~ Di + Xi, data = df)
+
     ```
+
+**ANS:** The ATE estimated using the linear regression of Yi on Di is approximately 1.5, which is expected as it matches the ATE value calculated in part (e).
 
 \newpage
 
@@ -157,23 +162,7 @@ progresa$treatment[is.na(progresa$treatment)] <- 0
 
 a)  Some variables in the dataset were collected in 1997 before treatment began. **Use these variables to test whether there are systematic differences between the control and the treatment group before the cash transfer began (i.e. test for systematic differences on all 1997 variables).** Describe your results. Does it matter whether there are systematic differences? Why or why not? Would it be a mistake to do the same test with these variables if they were collected after treatment began and if so why? Note: If your variable is a proportion (e.g. binary variables), you should use a proportions test, otherwise you can use a t-test.
 
-```{r , include=FALSE}
-
-## For continuous variables you can use the t-test
-#t.test()
-
-## For binary variables you should use the proportions test
-#prop.test()
-
-```
-
 ```{r}
-# creating subsets for control/treatment groups
-control <- progresa %>% 
-  filter(treatment == 0)
-treated <- progresa %>% 
-  filter(treatment == 1)
-
 # continuous variables (t.test)
 t.test(hhsize97 ~ treatment, data = progresa)
 t.test(vani ~ treatment, data = progresa)
@@ -181,7 +170,22 @@ t.test(vani1 ~ treatment, data = progresa)
 t.test(vani2 ~ treatment, data = progresa)
 
 # binary variables (proportion test)
-a <- table(progresa$treatment, progresa$dirtfloor97)[, c(2,1)]
+# dirt floor
+df_tb <- table(progresa$treatment, progresa$dirtfloor97)[, c(2,1)]
+prop.test(df_tb)
+
+# bathroom
+bth_tb <- table(progresa$treatment, progresa$bathroom97)[, c(2,1)]
+prop.test(bth_tb)
+
+# electricity 
+elec_tb <- table(progresa$treatment, progresa$electricity97)[, c(2,1)]
+prop.test(elec_tb)
+
+# homeownership
+own_tb <-table(progresa$treatment, progresa$homeown97)[, c(2,1)]
+prop.test(own_tb)
+
 
 ```
 
@@ -189,18 +193,21 @@ b)  Estimate the impact of program participation on the household's value of ani
 
     ```{r}
     vani_model <- lm(vani ~ treatment, data = progresa)
-    summary(vani_model)
+    vani_model
     ```
 
-    **ANS:**
+    **ANS:** Based on the results, we see that the r-squared value is zero. This indicates that applying the treatment (cash transfers) explains 0% of the variability in the value of animal holdings (vani).
 
 c)  Now, include at least 6 independent control variables in your regression. How does the impact of program participation change? Choose one of your other control variables and interpret the coefficient.
 
     ```{r}
-    lm(vani ~ treatment + age_hh + educ_hh + ethnicity_hh + healthcenter + min_dist + hairrigation, data = progresa)
+    lm(vani ~ treatment + age_hh + educ_hh +
+         ethnicity_hh + healthcenter + min_dist + 
+         hairrigation, data = progresa)
+
     ```
 
-    **ANS:**
+    **ANS:** Adding multiple variables slightly improves the model's predicting power, but not by a significatnt amount. The model with 6 control variables explains approximately 4.9% of the variability in vani. Despite this we can still interpret the coefficients. For example, if you were to hold all other variables constant, a one unit increase in the minimum distance between the location and an urban center (`min dist`) results in a 1.17 unit increase in `vani`.
 
 d)  The dataset also contains a variable `intention_to_treat`. This variable identifies eligible households in participating villages. Most of these households ended up in the treatment group receiving the cash transfer, but some did not. Test if the program has an effect on the value of animal holdings of these non-participants (spillover effects). Think of a reason why there might or might not be spillover effects.
 
@@ -214,27 +221,10 @@ d)  The dataset also contains a variable `intention_to_treat`. This variable ide
                        1, 0)
 
     # test 
-    summary(lm(vani ~ pseudo_treatment, data = progresa))
+    lm(vani ~ pseudo_treatment, data = progresa)
 
     ```
 
-\noindent **Hint**: Create a pseudo-treatment variable that is = 1 for individuals who were intended to get treatment but did not receive it, = 0 for the normal control group and excludes the normal treatment group.
-
-```{r , include=FALSE}
-# Examine number of hh that were intended to get treatment and that ended up receiving treatment
-table(treatment = progresa$treatment, intention_to_treat = progresa$intention_to_treat, exclude = NULL)
-
-# Create a new treatment variable that is:
-# = 1 if intention_to_treat == 1 AND not in the actual treatment
-# = 0 for normal control hh.
-
-# This creates a new variable called pseudo_treatment that has missing values for every hh
-progresa$pseudo_treatment <- NA
-# Replace NAs with 1 for the new intervention group
-progresa$pseudo_treatment[] <- 1
-# Replace NAs with 0 for the normal control group
-progresa$pseudo_treatment[] <- 0
-
-```
+**ANS:** This model also has an r-squared value of 0, meaning that `pseudo_treatment` has no influence on `vani`. Although it is not evident for the `vani` variable, spill over effects are still possible. As seen in the table, 7671 families qualified for the treatment and decided to participate. This is much larger that the 490 individuals who qualified and denied treatment (denied cash incentives). Since a larger number decided to participate, it's possible that the improved welfare of these select individuals will "spill over" and improve quality of life in the town all together.
 
 \newpage
