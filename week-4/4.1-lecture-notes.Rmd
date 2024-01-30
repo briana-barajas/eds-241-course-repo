@@ -1,0 +1,24 @@
+---
+title: "4.1 Lecture Notes"
+author: "Briana Barajas"
+date: 2024-01-30
+---
+
+## Interpret Regression Results
+
+-   Reviewing DUI fatality problem results
+    -   as the beer tax increases by +1 dollar per case, the fatalities per 100k people decreases by **1.041**
+    -   the asterisk in -1.041\*\*\* indicate that the p-value is very small (p\<0.01), so the result is significant at the 1% level
+    -   standard error for the -1.04 slope is below it in parenthesis, 0.376
+-   the larger the standard error, the larger the interval (?) so you cannot reject the null
+-   slope
+    -   point estimate
+    -   size of estimation (?)
+-   precision
+    -   p-value tells you about rejecting/accepting the nukk
+    -   standard error tells you about how precisely you've estimated
+-   Note
+
+## Fixed-Effect Model
+
+-   get rid of ${\alpha}_i$ by using the within cariation in the data

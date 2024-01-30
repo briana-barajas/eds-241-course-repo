@@ -65,3 +65,11 @@ output: html_document
         -   ${\alpha}_i$ represents the time-invariant, unobserved factors that predict the fatality rate in state $i$
         -   the presence of ${\alpha}_i$ will cause omitted variable bias in the cross-sectional regression IF ${\alpha}_i$ is ***correlated*** with $D_{it}$
 -   Note
+
+## First Difference vs. Within Transformation Estimator
+
+-   estimators are equivalent if T = 2
+    -   differ when T\>2
+-   without heteroskedasticity and serial correlation, the within estimator is more efficient
+    -   more efficient = has lower standard
+-   review the first difference estimator, and the within-transformation estimator
