@@ -12,7 +12,7 @@ header-includes:
   \renewcommand{\thesubsection}{Question (\alph{subsection})}
 ---
 
-**Reminders:** Make sure to read through the setup in markdown. Remember to write out interpretations and report your results in writing (and table/plot etc) forms.
+***Reminders:** Make sure to read through the setup in markdown. Remember to write out interpretations and report your results in writing (and table/plot etc) forms.*
 
 ```{r, include=FALSE}
 
@@ -48,32 +48,52 @@ options(scipen=999)
 
 ```
 
-# Part 1 Treatment Ignorability Assumption and Applying Matching Estimators (19 points):
+# *Part 1 Treatment Ignorability Assumption and Applying Matching Estimators (19 points):*
 
-The goal is to estimate the causal effect of maternal smoking during pregnancy on infant birth weight using the treatment ignorability assumptions. The data are taken from the National Natality Detail Files, and the extract "SMOKING_EDS241.csv"' is a random sample of all births in Pennsylvania during 1989-1991. Each observation is a mother-infant pair. The key variables are:
+*The goal is to estimate the causal effect of maternal smoking during pregnancy on infant birth weight using the treatment ignorability assumptions. The data are taken from the National Natality Detail Files, and the extract "SMOKING_EDS241.csv"' is a random sample of all births in Pennsylvania during 1989-1991. Each observation is a mother-infant pair. The key variables are:*
 
-**The outcome and treatment variables are:**
+***The outcome and treatment variables are:***
 
-\indent birthwgt=birth weight of infant in grams
+\indent \*`birthwgt` = birth weight of infant in grams\*
 
-\indent tobacco=indicator for maternal smoking
+\indent \*`tobacco` =indicator for maternal smoking\*
 
-**The control variables are:**
+***The control variables are:***
 
-\indent mage (mother's age), meduc (mother's education), mblack (=1 if mother identifies as Black), alcohol (=1 if consumed alcohol during pregnancy), first (=1 if first child), diabete (=1 if mother diabetic), anemia (=1 if mother anemic)
+\indent \*`mage` (mother's age), `meduc` (mother's education), `mblack` (=1 if mother identifies as Black), `alcohol` (=1 if consumed alcohol during pregnancy), `first` (=1 if first child), `diabete` (=1 if mother diabetic), `anemia` (=1 if mother anemic)\*
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
 # Load data for Part 1
-birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv"))
+birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>% 
+  clean_names()
 
 ```
 
-## Mean Differences, Assumptions, and Covariates *(3 pts)*
+## *Mean Differences, Assumptions, and Covariates (3 pts)*
 
-a)  What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt] Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt] Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption. Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]
+a)  ***What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]** Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt] Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption. Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]*
 
-```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# calculate the mean diff in birth weight for babies whose mother's smoked vs. did NOT smoke
+birth_weight %>% 
+  group_by(tobacco) %>%
+  summarise(mean_birthwgt = mean(birthwgt)) %>%
+  mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
+  kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
+      non-smoking mothers to keep the mean difference positive.") %>% 
+  kable_minimal()
+
+# calculate statistical significance of difference in mean birthweights
+t.test(birthwgt~tobacco, data = birth_weight)
+```
+
+```{r}
+# calculate the statistical significance of the difference in mean
+
+```
+
+```{r , }
 ## Calculate mean difference. Remember to calculate a measure of statistical significance
 
 ## For continuous variables you can use the t-test
@@ -86,9 +106,9 @@ a)  What is the mean difference in birth weight of infants with smoking and non-
 
 ```
 
-## ATE and Covariate Balance *(3 pts)*
+## *ATE and Covariate Balance (3 pts)*
 
-b)  Assume that maternal smoking is randomly assigned conditional on the observable covariates listed above. Estimate the effect of maternal smoking on birth weight using an OLS regression with NO linear controls for the covariates. [0.5 pts] Perform the same estimate including the control variables [0.5 pts]. Next, compute indices of covariate imbalance between the treated and non-treated regarding these covariates (see example file from class). Present your results in a table.[1 pts] What do you find and what does it say regarding whether the assumption you mentioned responding to a) is fulfilled? [1 pts]
+b)  *Assume that maternal smoking is randomly assigned conditional on the observable covariates listed above. Estimate the effect of maternal smoking on birth weight using an OLS regression with NO linear controls for the covariates. [0.5 pts] Perform the same estimate including the control variables [0.5 pts]. Next, compute indices of covariate imbalance between the treated and non-treated regarding these covariates (see example file from class). Present your results in a table.[1 pts] What do you find and what does it say regarding whether the assumption you mentioned responding to a) is fulfilled? [1 pts]*
 
 ```{r , include=TRUE, results = 'asis', tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -109,9 +129,9 @@ b)  Assume that maternal smoking is randomly assigned conditional on the observa
 
 ```
 
-## Propensity Score Estimation *(3 pts)*
+## *Propensity Score Estimation (3 pts)*
 
-c)  Next, estimate propensity scores (i.e. probability of being treated) for the sample, using the provided covariates. Create a regression table reporting the results of the regression and discuss what the covariate coefficients indicate and interpret one coefficient [1.5 pts]. Create histograms of the propensity scores comparing the distributions of propensity scores for smokers ('treated') and non-smokers ('control'), discuss the overlap and what it means [1.5 pts].
+c)  *Next, estimate propensity scores (i.e. probability of being treated) for the sample, using the provided covariates. Create a regression table reporting the results of the regression and discuss what the covariate coefficients indicate and interpret one coefficient [1.5 pts]. Create histograms of the propensity scores comparing the distributions of propensity scores for smokers ('treated') and non-smokers ('control'), discuss the overlap and what it means [1.5 pts].*
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -122,9 +142,9 @@ c)  Next, estimate propensity scores (i.e. probability of being treated) for the
 
 ```
 
-## Matching Balance *(3 pts)*
+## *Matching Balance (3 pts)*
 
-(d) Next, match treated/control mothers using your estimated propensity scores and nearest neighbor matching. Compare the balancing of pretreatment characteristics (covariates) between treated and non-treated units in the original dataset (from c) with the matched dataset (think about comparing histograms/regressions) [2 pts]. Make sure to report and discuss the balance statistics [1 pts].
+(d) *Next, match treated/control mothers using your estimated propensity scores and nearest neighbor matching. Compare the balancing of pretreatment characteristics (covariates) between treated and non-treated units in the original dataset (from c) with the matched dataset (think about comparing histograms/regressions) [2 pts]. Make sure to report and discuss the balance statistics [1 pts].*
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -136,9 +156,9 @@ c)  Next, estimate propensity scores (i.e. probability of being treated) for the
 ## Histogram of PS after matching
 ```
 
-## ATE with Nearest Neighbor *(3 pts)*
+## *ATE with Nearest Neighbor (3 pts)*
 
-(e) Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)
+(e) *Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)*
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -149,9 +169,9 @@ c)  Next, estimate propensity scores (i.e. probability of being treated) for the
 
 ```
 
-## ATE with WLS Matching *(3 pts)*
+## *ATE with WLS Matching (3 pts)*
 
-f)  Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.
+f)  *Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.*
 
 ```{r , include=TRUE, results='asis', tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ## Weighted least Squares (WLS) estimator Preparation
@@ -164,19 +184,19 @@ f)  Last, use the original dataset and perform the weighted least squares estima
 
 ```
 
-## Differences in Estimates *(1 pts)*
+## *Differences in Estimates (1 pts)*
 
-g)  Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?
+g)  *Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?*
 
 \newpage
 
-# Part 2 Panel model and fixed effects (6 points)
+# *Part 2 Panel model and fixed effects (6 points)*
 
-\indent We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997). \indent *Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.
+\indent \*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\* \indent \**Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.*
 
-## Estimating Effect with First Difference *(3 pts)*
+## *Estimating Effect with First Difference (3 pts)*
 
-Load the new baseline data (pre-program) and the follow-up data (post-program, from Assignment 1) into R. Create a time denoting variable (with the same name) in BOTH datasets with a value of 0 for the pre-program dataset and 1 for the other one. Create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani)-=. Estimate a standard difference-in-differences (DiD) regression and interpret the results.
+*Load the new baseline data (pre-program) and the follow-up data (post-program, from Assignment 1) into R. Create a time denoting variable (with the same name) in BOTH datasets with a value of 0 for the pre-program dataset and 1 for the other one. Create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani)-=. Estimate a standard difference-in-differences (DiD) regression and interpret the results.*
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 rm(list=ls()) # clean environment
@@ -190,7 +210,7 @@ rm(list=ls()) # clean environment
 
 ```
 
-a)  Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!) \indent *Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:
+a)  *Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!)* \indent \**Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:*
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ### Code included to help get you started
@@ -209,9 +229,9 @@ a)  Estimate a first-difference (FD) regression manually, interpret the results 
 
 ```
 
-## Fixed Effects Estimates *(2 pts)*
+## *Fixed Effects Estimates (2 pts)*
 
-b)  Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)
+b)  *Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)*
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ## Fixed Effects Regression
@@ -219,6 +239,6 @@ b)  Now also run a fixed effects (FE or 'within') regression and compare the res
 ## Present Regression Results
 ```
 
-## First Difference and Fixed Effects and Omitted Variable Problems *(1 pts)*
+## *First Difference and Fixed Effects and Omitted Variable Problems (1 pts)*
 
-c)  Explain briefly how the FD and FE estimator solves a specific omitted variable problem? Look at the example on beer tax and traffic fatalities from class to start thinking about ommitted variables. Give an example of a potential omitted variable for the example we are working with here that might confound our results? For that omitted variable, is a FE or FD estimator better? One example is enough.
+c)  *Explain briefly how the FD and FE estimator solves a specific omitted variable problem? Look at the example on beer tax and traffic fatalities from class to start thinking about ommitted variables. Give an example of a potential omitted variable for the example we are working with here that might confound our results? For that omitted variable, is a FE or FD estimator better? One example is enough.*
