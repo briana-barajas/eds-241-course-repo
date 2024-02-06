@@ -12,7 +12,7 @@ header-includes:
   \renewcommand{\thesubsection}{Question (\alph{subsection})}
 ---
 
-***Reminders:** Make sure to read through the setup in markdown. Remember to write out interpretations and report your results in writing (and table/plot etc) forms.*
+**Reminders:** Make sure to read through the setup in markdown. Remember to write out interpretations and report your results in writing (and table/plot etc) forms.
 
 ```{r, include=FALSE}
 
@@ -48,19 +48,39 @@ options(scipen=999)
 
 ```
 
-# *Part 1 Treatment Ignorability Assumption and Applying Matching Estimators (19 points):*
+# Part 1 Treatment Ignorability Assumption and Applying Matching Estimators (19 points):
 
-*The goal is to estimate the causal effect of maternal smoking during pregnancy on infant birth weight using the treatment ignorability assumptions. The data are taken from the National Natality Detail Files, and the extract "SMOKING_EDS241.csv"' is a random sample of all births in Pennsylvania during 1989-1991. Each observation is a mother-infant pair. The key variables are:*
+The goal is to estimate the causal effect of maternal smoking during pregnancy on infant birth weight using the treatment ignorability assumptions. The data are taken from the National Natality Detail Files, and the extract "SMOKING_EDS241.csv"' is a random sample of all births in Pennsylvania during 1989-1991. Each observation is a mother-infant pair. The key variables are:
 
-***The outcome and treatment variables are:***
+**The outcome and treatment variables are:**
 
-\indent \*`birthwgt` = birth weight of infant in grams\*
+\indent
 
-\indent \*`tobacco` =indicator for maternal smoking\*
+-   `birthwgt` = birth weight of infant in grams
 
-***The control variables are:***
+-   `tobacco` =indicator for maternal smoking
 
-\indent \*`mage` (mother's age), `meduc` (mother's education), `mblack` (=1 if mother identifies as Black), `alcohol` (=1 if consumed alcohol during pregnancy), `first` (=1 if first child), `diabete` (=1 if mother diabetic), `anemia` (=1 if mother anemic)\*
+**The control variables are:**
+
+\indent
+
+continuous:
+
+-   `mage` (mother's age),
+
+-   `meduc` (mother's education),
+
+categorical:
+
+-   `mblack` (=1 if mother identifies as Black)
+
+-   `alcohol` (=1 if consumed alcohol during pregnancy),
+
+-   `first` (=1 if first child)
+
+-   `diabete` (=1 if mother diabetic)
+
+-   `anemia` (=1 if mother anemic)
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -70,7 +90,7 @@ birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>%
 
 ```
 
-## *Mean Differences, Assumptions, and Covariates (3 pts)*
+## Mean Differences, Assumptions, and Covariates (3 pts)
 
 a)  ***What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]***
 
@@ -88,19 +108,70 @@ a)  ***What is the mean difference in birth weight of infants with smoking and n
     t.test(birthwgt~tobacco, data = birth_weight)
     ```
 
-    **ANS:** As illustrated in Table 1, the mean difference in birth weight of infants with smoking versus non-smoking mothers is 244.54 grams. This difference in birth weight is statistically significant (p \< 0.05), so we can reject the null hypothesis that the difference in means is equal to 0.
+    **ANS:** As illustrated in **Table 1**, the mean difference in birth weight of infants with smoking versus non-smoking mothers is 244.54 grams. The mean values for smoking (`tobacco` = 1) and non-smoking (`tobacco` = 0) mothers, as well as the difference between these means (`mean_bw_diff`) is summarized in Table 1. The difference in birth weight is statistically significant (p \< 0.05), so we can reject the null hypothesis that the difference in means is equal to 0.
 
     \|
 
     ***Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt]***
 
-    **ANS:** This value corresponds with the average treatment effect (ATE) of maternal smoking, assuming that the treatment effect is constant across the entire population, and that the control variables (mother's age, mother's education, etc.) have no influence on maternal smoking or birth weight. The latter point refers to the ignorability assumption.
+    **ANS:** This mean difference corresponds with the average treatment effect (ATE) of maternal smoking, assuming that the treatment effect is constant across the entire population, and that the control variables (mother's age, mother's education, etc.) have no influence on maternal smoking or birth weight. The latter point refers to the ignorability assumption.
 
     \|
 
-    *Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption.*
+    ***Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption.***
 
-    **ANS:** Note
+    ```{r}
+    ## ========================================
+    ##       create subsets of var type   ----
+    ## ========================================
+
+    # create df with tobacco and continuous variables
+    cont_bw_df <- birth_weight %>% 
+      select(c(mage, meduc, tobacco))
+
+    # create df with tobacco and categorical variables
+    cat_bw_df <- birth_weight %>% 
+      select(-c(mage, meduc, birthwgt))
+      
+    ## ========================================
+    ##       t-test on continuous vars     ----
+    ## ========================================
+
+    # list of continuous variables
+    cont_vars_bw <- birth_weight %>% 
+      select(c(mage, meduc)) %>% 
+      names
+
+    # create empty df to store results
+    t_test_bw_result <- data.frame()
+
+    # apply t-test to all continuous variables listed
+    for (i in cont_vars_bw) {
+
+      # generate t.test formula
+      formula <- as.formula(paste(i, "~ tobacco"))
+
+      # apply t.test
+      t_test_bw_result <- t.test(formula, data = cont_bw_df)
+      
+      # tidy df
+      t_test_bw_tidy <- broom::tidy(t_test_bw_result)
+      t_test_bw_tidy$Variable <-
+
+    }
+
+      # tidy results df, add variable column
+      t_test_bw_tidy <- broom::tidy(t_test_bw_result)
+
+      t_test_bw_tidy$Variable <- i
+
+      t_test_bw_table <- rbind(t_test_bw_result, t_test_bw_tidy)
+    ```
+
+    ```{r}
+    ```
+
+    **ANS:**
 
     *Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]*
 
@@ -208,7 +279,7 @@ g)  *Explain why it was to be expected given your analysis above that there is a
 
 # *Part 2 Panel model and fixed effects (6 points)*
 
-\indent \*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\* \indent \**Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.*
+\indent *\*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\** \indent *\*Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.*
 
 ## *Estimating Effect with First Difference (3 pts)*
 
@@ -226,7 +297,7 @@ rm(list=ls()) # clean environment
 
 ```
 
-a)  *Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!)* \indent \**Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:*
+a)  *Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!)* \indent *\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:*
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ### Code included to help get you started
