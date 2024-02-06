@@ -72,21 +72,37 @@ birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>%
 
 ## *Mean Differences, Assumptions, and Covariates (3 pts)*
 
-a)  ***What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]** Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt] Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption. Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]*
+a)  ***What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]***
 
-```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
-# calculate the mean diff in birth weight for babies whose mother's smoked vs. did NOT smoke
-birth_weight %>% 
-  group_by(tobacco) %>%
-  summarise(mean_birthwgt = mean(birthwgt)) %>%
-  mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
-  kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
-      non-smoking mothers to keep the mean difference positive.") %>% 
-  kable_minimal()
+    ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+    # calculate the mean difference in birthweight
+    birth_weight %>% 
+      group_by(tobacco) %>%
+      summarise(mean_birthwgt = mean(birthwgt)) %>%
+      mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
+      kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
+          non-smoking mothers to keep the mean difference positive.") %>% 
+      kable_minimal()
 
-# calculate statistical significance of difference in mean birthweights
-t.test(birthwgt~tobacco, data = birth_weight)
-```
+    # calculate statistical significance of difference in mean birthweights
+    t.test(birthwgt~tobacco, data = birth_weight)
+    ```
+
+    **ANS:** As illustrated in Table 1, the mean difference in birth weight of infants with smoking versus non-smoking mothers is 244.54 grams. This difference in birth weight is statistically significant (p \< 0.05), so we can reject the null hypothesis that the difference in means is equal to 0.
+
+    \|
+
+    ***Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt]***
+
+    **ANS:** This value corresponds with the average treatment effect (ATE) of maternal smoking, assuming that the treatment effect is constant across the entire population, and that the control variables (mother's age, mother's education, etc.) have no influence on maternal smoking or birth weight. The latter point refers to the ignorability assumption.
+
+    \|
+
+    *Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption.*
+
+    **ANS:** Note
+
+    *Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]*
 
 ```{r}
 # calculate the statistical significance of the difference in mean
