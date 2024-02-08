@@ -37,6 +37,7 @@ library(estimatr)
 library(gridExtra)    # aesthetic plots/tables
 library(stargazer)
 library(kableExtra)
+library(sjPlot)
 
 library(janitor)     # potentially useful 
 library(cowplot)
@@ -92,88 +93,120 @@ birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>%
 
 ## Mean Differences, Assumptions, and Covariates (3 pts)
 
-a)  ***What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]***
+a)  **What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]**
 
-    ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
-    # calculate the mean difference in birthweight
-    birth_weight %>% 
-      group_by(tobacco) %>%
-      summarise(mean_birthwgt = mean(birthwgt)) %>%
-      mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
-      kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
+```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# calculate the mean difference in birthweight
+birth_weight %>% 
+  group_by(tobacco) %>%
+  summarise(mean_birthwgt = mean(birthwgt)) %>%
+  mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
+  kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
           non-smoking mothers to keep the mean difference positive.") %>% 
-      kable_minimal()
+  kable_minimal()
 
-    # calculate statistical significance of difference in mean birthweights
-    t.test(birthwgt~tobacco, data = birth_weight)
-    ```
+# calculate statistical significance of difference in mean birthweights
+t.test(birthwgt~tobacco, data = birth_weight)
+```
 
-    **ANS:** As illustrated in **Table 1**, the mean difference in birth weight of infants with smoking versus non-smoking mothers is 244.54 grams. The mean values for smoking (`tobacco` = 1) and non-smoking (`tobacco` = 0) mothers, as well as the difference between these means (`mean_bw_diff`) is summarized in Table 1. The difference in birth weight is statistically significant (p \< 0.05), so we can reject the null hypothesis that the difference in means is equal to 0.
+**ANS:** As illustrated in **Table 1**, the mean difference in birth weight of infants with smoking versus non-smoking mothers is 244.54 grams. The mean values for smoking (`tobacco` = 1) and non-smoking (`tobacco` = 0) mothers, as well as the difference between these means (`mean_bw_diff`) is summarized in Table 1. The difference in birth weight is statistically significant (p \< 0.05), so we can reject the null hypothesis that the difference in means is equal to 0.
 
-    \|
+\|
 
-    ***Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt]***
+**Under what assumption does this correspond to the average treatment effect of maternal smoking during pregnancy on infant birth weight? [0.5 pt]**
 
-    **ANS:** This mean difference corresponds with the average treatment effect (ATE) of maternal smoking, assuming that the treatment effect is constant across the entire population, and that the control variables (mother's age, mother's education, etc.) have no influence on maternal smoking or birth weight. The latter point refers to the ignorability assumption.
+**ANS:** This mean difference corresponds with the average treatment effect (ATE) of maternal smoking, assuming that the treatment effect is constant across the entire population, and that the control variables (mother's age, mother's education, etc.) have no influence on maternal smoking or birth weight. The latter point refers to the ignorability assumption.
 
-    \|
+\|
 
-    ***Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption.***
+**Calculate and create a table demonstrating the differences in the mean proportions/values of covariates observed in smokers and non-smokers (remember to report whether differences are statistically significant) and discuss whether this provides empirical evidence for or against this assumption.**
 
-    ```{r}
-    ## ========================================
-    ##       create subsets of var type   ----
-    ## ========================================
+```{r}
+## ========================================
+##       Prep subsets for testing      ----
+## ========================================
 
-    # create df with tobacco and continuous variables
-    cont_bw_df <- birth_weight %>% 
-      select(c(mage, meduc, tobacco))
+# create df with tobacco and continuous variable
+continuous <- birth_weight %>% 
+  select(tobacco, mage, meduc)
 
-    # create df with tobacco and categorical variables
-    cat_bw_df <- birth_weight %>% 
-      select(-c(mage, meduc, birthwgt))
-      
-    ## ========================================
-    ##       t-test on continuous vars     ----
-    ## ========================================
+# create df with tobacco and categorical variables
+binary <- birth_weight %>% 
+  select(tobacco, anemia, diabete, tobacco, alcohol, mblack, first)
 
-    # list of continuous variables
-    cont_vars_bw <- birth_weight %>% 
-      select(c(mage, meduc)) %>% 
-      names
+# create list of variable names 
+binary_names <- binary %>% names()
+continuous_names <- names(continuous)[2:3]
 
-    # create empty df to store results
-    t_test_bw_result <- data.frame()
+# create empty data frame to store results
+prop_test_results <- data.frame() 
+t_test_results <- data.frame()
 
-    # apply t-test to all continuous variables listed
-    for (i in cont_vars_bw) {
+## ========================================
+##       prop test for binary vars     ----
+## ========================================
 
-      # generate t.test formula
-      formula <- as.formula(paste(i, "~ tobacco"))
+for (i in binary_names) {
+  
+  # split data into treated and untreated
+  treated <- binary %>% filter(tobacco == 1) %>% pull(!!sym(i)) 
+  untreated <- binary %>% filter(tobacco == 0) %>% pull(!!sym(i))
+  
+  # perform the prop test
+  prop_test_result <- prop.test(x = c(sum(treated), 
+                                      sum(untreated)),
+                                
+                                n = c(length(treated), 
+                                      length(untreated)),correct = FALSE)
+  
+  prop_test_result_tidy <- broom::tidy(prop_test_result)
+  prop_test_result_tidy$Variable <- i
+  prop_test_results <- rbind(prop_test_results, prop_test_result_tidy)
+}
 
-      # apply t.test
-      t_test_bw_result <- t.test(formula, data = cont_bw_df)
-      
-      # tidy df
-      t_test_bw_tidy <- broom::tidy(t_test_bw_result)
-      t_test_bw_tidy$Variable <-
+## ========================================
+##       t-test for continuous vars    ----
+## ========================================
+for (i in continuous_names) {
+  # Dynamically creating the formula for the t-test
+  formula <- as.formula(paste(i, "~ tobacco"))
+  
+  # Performing the t-test
+  t_test_result <- t.test(formula, data = continuous)
+  
+  # Storing the tidy results of the t-test in the data frame
+  t_test_result_tidy <- broom::tidy(t_test_result)
+  t_test_result_tidy$Variable <- i
+  t_test_results <- rbind(t_test_results, t_test_result_tidy)
+}
 
-    }
 
-      # tidy results df, add variable column
-      t_test_bw_tidy <- broom::tidy(t_test_bw_result)
+## ========================================
+##            display results          ----
+## ========================================
 
-      t_test_bw_tidy$Variable <- i
+# combine results to single df
+combine_results <- bind_rows(
+  prop_test_results %>% select(Variable, estimate1, estimate2, p.value),
+  t_test_results %>% select(Variable, estimate1, estimate2, p.value)
+)
 
-      t_test_bw_table <- rbind(t_test_bw_result, t_test_bw_tidy)
-    ```
+# create output table
+combined_results_table <- kable(combine_results, format = "latex",
+                                col.names = c("Variable", 
+                                              "Proportion or Mean Treated",
+                                              "Proportion or Mean Control", "P-Value"),
+                                caption = "Treated and Untreated Pre-treatment Proportion and T-Test Results") %>% 
+  kable_styling(font_size = 7, latex_options = "hold_position") %>% 
+  kable_minimal()
 
-    ```{r}
-    ```
+# print table
+combined_results_table
+```
 
-    **ANS:**
+**ANS: [INPUT TABLE INTERPRETATION]**
 
-    *Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]*
+Remember that this is observational data. What other quantitative empirical evidence or test could help you assess the former assumption? [1.5 pt: 0.5 pt table, 1 pt discussion]
 
 ```{r}
 # calculate the statistical significance of the difference in mean
@@ -193,45 +226,84 @@ a)  ***What is the mean difference in birth weight of infants with smoking and n
 
 ```
 
-## *ATE and Covariate Balance (3 pts)*
+## ATE and Covariate Balance (3 pts)
 
-b)  *Assume that maternal smoking is randomly assigned conditional on the observable covariates listed above. Estimate the effect of maternal smoking on birth weight using an OLS regression with NO linear controls for the covariates. [0.5 pts] Perform the same estimate including the control variables [0.5 pts]. Next, compute indices of covariate imbalance between the treated and non-treated regarding these covariates (see example file from class). Present your results in a table.[1 pts] What do you find and what does it say regarding whether the assumption you mentioned responding to a) is fulfilled? [1 pts]*
+b)  Assume that maternal smoking is randomly assigned conditional on the observable covariates listed above. Estimate the effect of maternal smoking on birth weight using an OLS regression with NO linear controls for the covariates. [0.5 pts] Perform the same estimate including the control variables [0.5 pts]. Next, compute indices of covariate imbalance between the treated and non-treated regarding these covariates (see example file from class). Present your results in a table.[1 pts] What do you find and what does it say regarding whether the assumption you mentioned responding to a) is fulfilled? [1 pts]
 
 ```{r , include=TRUE, results = 'asis', tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-# ATE Regression univariate
+## ========================================
+##             run regressions         ----
+## ========================================
 
+# ATE Regression univariate
+univariate <- lm(birthwgt~tobacco, data = birth_weight)
 
 # ATE with covariates
+multiple_reg <- lm(birthwgt~ anemia + diabete + tobacco + 
+                     alcohol + mblack + first + mage + meduc, 
+                   data = birth_weight)
+
+## ========================================
+##             plot results            ----
+## ========================================
+
+# tidy results
+univariate <- broom::tidy(univariate)
+multiple_reg <- broom::tidy(multiple_reg)
+
+# print results
+univariate %>% kbl(caption = "Univariate Linear Regression") %>% 
+  kable_minimal()
+multiple_reg %>% kbl(caption = "Univariate Linear Regression") %>% 
+  kable_minimal()
+
+## ========================================
+##             covariate balance       ----
+## ========================================
+
+# compute balance for multiple linear regression
+covariate_balance <- xBalance(birthwgt~ anemia + diabete + tobacco + 
+                                alcohol + mblack + first + mage + meduc, 
+                              data = birth_weight, 
+                              report = c("std.diffs","chisquare.test", "p.values"))
 
 
-# Present Regression Results
-
-
-# Covariate balance
-
-
-# Balance Table 
-
+# print results in neat balance table
+covariate_balance %>% kbl() %>% kable_minimal()
 
 ```
 
-## *Propensity Score Estimation (3 pts)*
+## Propensity Score Estimation (3 pts)
 
-c)  *Next, estimate propensity scores (i.e. probability of being treated) for the sample, using the provided covariates. Create a regression table reporting the results of the regression and discuss what the covariate coefficients indicate and interpret one coefficient [1.5 pts]. Create histograms of the propensity scores comparing the distributions of propensity scores for smokers ('treated') and non-smokers ('control'), discuss the overlap and what it means [1.5 pts].*
+c)  Next, estimate propensity scores (i.e. probability of being treated) for the sample, using the provided covariates. Create a regression table reporting the results of the regression and discuss what the covariate coefficients indicate and interpret one coefficient [1.5 pts]. Create histograms of the propensity scores comparing the distributions of propensity scores for smokers ('treated') and non-smokers ('control'), discuss the overlap and what it means [1.5 pts].
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
 ## Propensity Scores
+ps	<- glm(treat	~ age	+ educ	+ nodegree	+ re74	+ re75,
+          data	=lalonde,	family	= binomial())
+summary(ps)
 
+# calculate propensity score for covariares
+propensity_scores <- glm(birthwgt~ anemia + diabete + tobacco + alcohol + 
+                           mblack + first + mage + meduc, 
+                         data = birth_weight)
+
+summary(propensity_scores)
 
 ## PS Histogram Unmatched 
 
 ```
 
-## *Matching Balance (3 pts)*
+```{r}
 
-(d) *Next, match treated/control mothers using your estimated propensity scores and nearest neighbor matching. Compare the balancing of pretreatment characteristics (covariates) between treated and non-treated units in the original dataset (from c) with the matched dataset (think about comparing histograms/regressions) [2 pts]. Make sure to report and discuss the balance statistics [1 pts].*
+```
+
+
+## Matching Balance (3 pts)
+
+(d) Next, match treated/control mothers using your estimated propensity scores and nearest neighbor matching. Compare the balancing of pretreatment characteristics (covariates) between treated and non-treated units in the original dataset (from c) with the matched dataset (think about comparing histograms/regressions) [2 pts]. Make sure to report and discuss the balance statistics [1 pts].
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -243,9 +315,9 @@ c)  *Next, estimate propensity scores (i.e. probability of being treated) for th
 ## Histogram of PS after matching
 ```
 
-## *ATE with Nearest Neighbor (3 pts)*
+## ATE with Nearest Neighbor (3 pts)
 
-(e) *Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)*
+(e) Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -256,9 +328,9 @@ c)  *Next, estimate propensity scores (i.e. probability of being treated) for th
 
 ```
 
-## *ATE with WLS Matching (3 pts)*
+## ATE with WLS Matching (3 pts)
 
-f)  *Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.*
+f)  Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.
 
 ```{r , include=TRUE, results='asis', tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ## Weighted least Squares (WLS) estimator Preparation
@@ -271,19 +343,19 @@ f)  *Last, use the original dataset and perform the weighted least squares estim
 
 ```
 
-## *Differences in Estimates (1 pts)*
+## Differences in Estimates (1 pts)
 
-g)  *Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?*
+g)  Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?
 
 \newpage
 
-# *Part 2 Panel model and fixed effects (6 points)*
+# Part 2 Panel model and fixed effects (6 points)
 
-\indent *\*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\** \indent *\*Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.*
+\indent *\*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\*\* \indent *\*Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.\*
 
-## *Estimating Effect with First Difference (3 pts)*
+## Estimating Effect with First Difference (3 pts)
 
-*Load the new baseline data (pre-program) and the follow-up data (post-program, from Assignment 1) into R. Create a time denoting variable (with the same name) in BOTH datasets with a value of 0 for the pre-program dataset and 1 for the other one. Create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani)-=. Estimate a standard difference-in-differences (DiD) regression and interpret the results.*
+Load the new baseline data (pre-program) and the follow-up data (post-program, from Assignment 1) into R. Create a time denoting variable (with the same name) in BOTH datasets with a value of 0 for the pre-program dataset and 1 for the other one. Create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani)-=. Estimate a standard difference-in-differences (DiD) regression and interpret the results.
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 rm(list=ls()) # clean environment
@@ -297,7 +369,7 @@ rm(list=ls()) # clean environment
 
 ```
 
-a)  *Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!)* \indent *\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:*
+a)  Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!) \indent \*\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:\*
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ### Code included to help get you started
@@ -316,9 +388,9 @@ a)  *Estimate a first-difference (FD) regression manually, interpret the results
 
 ```
 
-## *Fixed Effects Estimates (2 pts)*
+## Fixed Effects Estimates (2 pts)
 
-b)  *Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)*
+b)  Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ## Fixed Effects Regression
@@ -326,6 +398,6 @@ b)  *Now also run a fixed effects (FE or 'within') regression and compare the re
 ## Present Regression Results
 ```
 
-## *First Difference and Fixed Effects and Omitted Variable Problems (1 pts)*
+## First Difference and Fixed Effects and Omitted Variable Problems (1 pts)
 
-c)  *Explain briefly how the FD and FE estimator solves a specific omitted variable problem? Look at the example on beer tax and traffic fatalities from class to start thinking about ommitted variables. Give an example of a potential omitted variable for the example we are working with here that might confound our results? For that omitted variable, is a FE or FD estimator better? One example is enough.*
+c)  Explain briefly how the FD and FE estimator solves a specific omitted variable problem? Look at the example on beer tax and traffic fatalities from class to start thinking about ommitted variables. Give an example of a potential omitted variable for the example we are working with here that might confound our results? For that omitted variable, is a FE or FD estimator better? One example is enough.
