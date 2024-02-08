@@ -35,14 +35,13 @@ library(lmtest)
 library(estimatr)
 
 library(gridExtra)    # aesthetic plots/tables
-library(stargazer)
 library(kableExtra)
-library(sjPlot)
 
 library(janitor)     # potentially useful 
 library(cowplot)
 library(tinytex)
 library(datasets)
+library(formatR)
 
 # Disable scientific notation
 options(scipen=999)
@@ -87,7 +86,7 @@ categorical:
 
 # Load data for Part 1
 birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>% 
-  clean_names()
+  janitor::clean_names()
 
 ```
 
@@ -213,7 +212,7 @@ Remember that this is observational data. What other quantitative empirical evid
 
 ```
 
-```{r , }
+```{r}
 ## Calculate mean difference. Remember to calculate a measure of statistical significance
 
 ## For continuous variables you can use the t-test
@@ -253,25 +252,26 @@ univariate <- broom::tidy(univariate)
 multiple_reg <- broom::tidy(multiple_reg)
 
 # print results
-univariate %>% kbl(caption = "Univariate Linear Regression") %>% 
+univariate %>% kbl(caption = "Univariate Linear Regression") %>%
   kable_minimal()
-multiple_reg %>% kbl(caption = "Univariate Linear Regression") %>% 
+multiple_reg %>% kbl(caption = "Multiple Linear Regression") %>%
   kable_minimal()
 
 ## ========================================
-##             covariate balance       ----
+##         covariate balance table     ----
 ## ========================================
 
 # compute balance for multiple linear regression
-covariate_balance <- xBalance(birthwgt~ anemia + diabete + tobacco + 
-                                alcohol + mblack + first + mage + meduc, 
-                              data = birth_weight, 
+covariate_balance <- xBalance(birthwgt~ anemia + diabete + tobacco +
+                                alcohol + mblack + first + mage + meduc,
+                              data = birth_weight,
                               report = c("std.diffs","chisquare.test", "p.values"))
 
 
 # print results in neat balance table
-covariate_balance %>% kbl() %>% kable_minimal()
-
+tidy.xbal(covariate_balance) %>% 
+  select(-NA.info) %>% 
+  kbl(caption = "Covariate Model Balance Table (1b)") %>% kable_minimal()
 ```
 
 ## Propensity Score Estimation (3 pts)
@@ -280,24 +280,22 @@ c)  Next, estimate propensity scores (i.e. probability of being treated) for the
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-## Propensity Scores
-ps	<- glm(treat	~ age	+ educ	+ nodegree	+ re74	+ re75,
-          data	=lalonde,	family	= binomial())
-summary(ps)
+# calculate propensity score for model with covariates (CHECK PREDICTOR)
+propensity_scores <- glm(tobacco ~ anemia + diabete + alcohol + mblack + first +
+                           mage + meduc, data = birth_weight,
+                         family = binomial())
 
-# calculate propensity score for covariares
-propensity_scores <- glm(birthwgt~ anemia + diabete + tobacco + alcohol + 
-                           mblack + first + mage + meduc, 
-                         data = birth_weight)
+# view model summary
+prop_scores_tidy <- broom::tidy(propensity_scores)
+prop_scores_tidy %>% kbl(caption = "Propensity Scores for Covariate Model (1c)") %>% kable_minimal()
 
-summary(propensity_scores)
+# add psvalue column using calculated propensity score
+birth_weight$psvalue <- predict(propensity_scores, type = "response")
 
-## PS Histogram Unmatched 
-
-```
-
-```{r}
-
+# plot unmatched, propensity histogram
+histbackback(split(birth_weight$psvalue, birth_weight$tobacco),
+             main = "Unmatched Propensity Scores",
+             xlab = c("non-smoking", "smoking"))
 ```
 
 
@@ -305,14 +303,54 @@ summary(propensity_scores)
 
 (d) Next, match treated/control mothers using your estimated propensity scores and nearest neighbor matching. Compare the balancing of pretreatment characteristics (covariates) between treated and non-treated units in the original dataset (from c) with the matched dataset (think about comparing histograms/regressions) [2 pts]. Make sure to report and discuss the balance statistics [1 pts].
 
-```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-## Nearest-neighbor Matching
+## ========================================
+##        nearest neighbor matching    ----
+## ========================================
 
-## Covariate Imbalance post matching: 
+# match using nearest neighbors method
+match_bw <- matchit(tobacco ~ anemia + diabete + alcohol + mblack + first +
+                           mage + meduc, data = birth_weight,
+                    method = "nearest", ratio = 1)
 
+# store match data
+match_bw_df <- match.data(match_bw)
 
-## Histogram of PS after matching
+## ========================================
+##      covariate imbalance post-match ----
+## ========================================
+# compute post-match covariate imbalance
+covariate_balance_match <- xBalance(tobacco ~ anemia + diabete + alcohol + 
+                                      mblack + first + mage + meduc, 
+         data = match_bw_df, 
+         report = c("std.diffs","chisquare.test", "p.values"))
+
+# print results in balance table
+tidy.xbal(covariate_balance_match) %>% 
+  kbl(caption = "Covariate Balance Table - Matched (1d)") %>% kable_minimal()
+
+## ========================================
+##        prop scores of matched       ----
+## ========================================
+
+# calculate propensity score using matched data
+propensity_scores_match <- glm(tobacco ~ anemia + diabete + alcohol + mblack + 
+                                 first + mage + meduc, data = match_bw_df,
+                               family = binomial())
+
+# view model summary
+prop_scores_match_tidy <- broom::tidy(propensity_scores_match)
+prop_scores_match_tidy %>% kbl() %>% kable_minimal()
+
+# # add psvalue column using calculated propensity score
+# match_bw_df$psvalue <- predict(propensity_scores_match, type = "response")
+
+# plot matched, propensity histogram
+histbackback(split(match_bw_df$psvalue, match_bw_df$tobacco),
+             main = "Matched Propensity Scores",
+             xlab = c("non-smoking", "smoking"))
+
 ```
 
 ## ATE with Nearest Neighbor (3 pts)
