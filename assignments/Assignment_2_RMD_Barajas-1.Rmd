@@ -42,6 +42,7 @@ library(cowplot)
 library(tinytex)
 library(datasets)
 library(formatR)
+library(here)
 
 # Disable scientific notation
 options(scipen=999)
@@ -95,11 +96,13 @@ birth_weight <- read_csv(paste0(data_wd, "birthweight_simple.csv")) %>%
 a)  **What is the mean difference in birth weight of infants with smoking and non-smoking mothers? [1 pt]**
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
-# calculate the mean difference in birthweight
+# calculate the mean difference in birth weight
 birth_weight %>% 
   group_by(tobacco) %>%
   summarise(mean_birthwgt = mean(birthwgt)) %>%
+  
   mutate(mean_diff_bw = mean_birthwgt - dplyr::lead(mean_birthwgt)) %>% 
+  
   kbl(caption = "Subtracted mean birthweight for smoking mothers from mean birthweight for 
           non-smoking mothers to keep the mean difference positive.") %>% 
   kable_minimal()
@@ -250,7 +253,7 @@ multiple_reg <- lm(birthwgt~ anemia + diabete + tobacco +
 # tidy results
 univariate <- broom::tidy(univariate)
 multiple_reg <- broom::tidy(multiple_reg)
-
+  
 # print results
 univariate %>% kbl(caption = "Univariate Linear Regression") %>%
   kable_minimal()
@@ -262,7 +265,7 @@ multiple_reg %>% kbl(caption = "Multiple Linear Regression") %>%
 ## ========================================
 
 # compute balance for multiple linear regression
-covariate_balance <- xBalance(birthwgt~ anemia + diabete + tobacco +
+covariate_balance <- xBalance(tobacco ~ anemia + diabete +
                                 alcohol + mblack + first + mage + meduc,
                               data = birth_weight,
                               report = c("std.diffs","chisquare.test", "p.values"))
@@ -280,7 +283,7 @@ c)  Next, estimate propensity scores (i.e. probability of being treated) for the
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-# calculate propensity score for model with covariates (CHECK PREDICTOR)
+# calculate propensity score unmatched
 propensity_scores <- glm(tobacco ~ anemia + diabete + alcohol + mblack + first +
                            mage + meduc, data = birth_weight,
                          family = binomial())
@@ -289,7 +292,7 @@ propensity_scores <- glm(tobacco ~ anemia + diabete + alcohol + mblack + first +
 prop_scores_tidy <- broom::tidy(propensity_scores)
 prop_scores_tidy %>% kbl(caption = "Propensity Scores for Covariate Model (1c)") %>% kable_minimal()
 
-# add psvalue column using calculated propensity score
+# add psvalue for predicted propensity score
 birth_weight$psvalue <- predict(propensity_scores, type = "response")
 
 # plot unmatched, propensity histogram
@@ -297,7 +300,7 @@ histbackback(split(birth_weight$psvalue, birth_weight$tobacco),
              main = "Unmatched Propensity Scores",
              xlab = c("non-smoking", "smoking"))
 ```
-
+__NOTE:__ Propensity score is the chance of being treated (smoking). For example, the estimate for alcohol is 2.02, this high positive value means that if a mother drinks there's a high chance she also smoked. The negative values for `meduc` means that as mother's education increases, the chance of her smoking decreases.
 
 ## Matching Balance (3 pts)
 
@@ -334,17 +337,6 @@ tidy.xbal(covariate_balance_match) %>%
 ##        prop scores of matched       ----
 ## ========================================
 
-# calculate propensity score using matched data
-propensity_scores_match <- glm(tobacco ~ anemia + diabete + alcohol + mblack + 
-                                 first + mage + meduc, data = match_bw_df,
-                               family = binomial())
-
-# view model summary
-prop_scores_match_tidy <- broom::tidy(propensity_scores_match)
-prop_scores_match_tidy %>% kbl() %>% kable_minimal()
-
-# # add psvalue column using calculated propensity score
-# match_bw_df$psvalue <- predict(propensity_scores_match, type = "response")
 
 # plot matched, propensity histogram
 histbackback(split(match_bw_df$psvalue, match_bw_df$tobacco),
@@ -353,18 +345,31 @@ histbackback(split(match_bw_df$psvalue, match_bw_df$tobacco),
 
 ```
 
-## ATE with Nearest Neighbor (3 pts)
+## ATT with Nearest Neighbor (3 pts)
 
 (e) Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
-## Nearest Neighbor 
+# calculate difference by subgroup
+sumdiff_data <- match_bw_df %>% 
+  group_by(subclass) %>% 
+  mutate(pair_diff = birthwgt[tobacco == 1] -
+              birthwgt[tobacco == 0])
 
-## ATT
+# calculate sum of treatment column (NT)
+NT <- sum(birth_weight$tobacco)
 
+# calculate ATT
+sumdiff <- sum(sumdiff_data$pair_diff)/2
+ATT_nn <- 1/NT * sumdiff
+
+# print results
+paste("Estimate of ATT using matched dataset:", ATT_nn)
 
 ```
+
+__NOTE:__ The ATT is similar to the measure of ATE we conducted in part 1a, where the difference in means between smoking and non-smoking mothers 222 grams. This value is only slightly smaller than the mean difference in birth weight of unmatched mothers. Since this data was matched, we can see that smoking has a large impact on birth weight even when other factors (education, first, alcohol, etc.) are held constant.
 
 ## ATE with WLS Matching (3 pts)
 
@@ -381,6 +386,25 @@ f)  Last, use the original dataset and perform the weighted least squares estima
 
 ```
 
+```{r}
+# preliminary calculations for weighted least squares (WLS)
+D <- birth_weight$tobacco
+PS <- birth_weight$psvalue
+
+# calculate weights
+birth_weight$wgt <- (D/PS + (1-D)/(1-PS))
+
+# calculate WLS estimate
+wls <- lm(birthwgt ~ tobacco + anemia + diabete + alcohol + mblack + first + mage + meduc, 
+          data = birth_weight, weights = wgt)
+
+# print results
+broom::tidy(summary(wls)) %>% 
+  kbl() %>% kable_minimal()
+
+```
+
+
 ## Differences in Estimates (1 pts)
 
 g)  Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?
@@ -392,19 +416,17 @@ g)  Explain why it was to be expected given your analysis above that there is a 
 \indent *\*We will use the progresa data (progresa.csv) from last time as well as a new dataset, progresa_pre.csv. In the original dataset, treatment households had been receiving the transfer for a year. Now, you get an additional dataset with information on the same households from before the program was implemented, establishing a baseline study (year 1997).\*\* \indent *\*Note: You will need to install the packages plm and dplyr (included in template preamble). Again, you can find a description of the variables at the bottom of PDF and HERE.\*
 
 ## Estimating Effect with First Difference (3 pts)
+Setup: Load the new baseline data (progresa_pre_1997.csv) and the follow-up data (progresa_post_1999.csv) into R. Note that we created a time denoting variable (with the same name, ‘year’) in BOTH datasets. Then, create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani).
 
-Load the new baseline data (pre-program) and the follow-up data (post-program, from Assignment 1) into R. Create a time denoting variable (with the same name) in BOTH datasets with a value of 0 for the pre-program dataset and 1 for the other one. Create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of animal holdings (vani)-=. Estimate a standard difference-in-differences (DiD) regression and interpret the results.
-
-```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60), results='hide'}
 rm(list=ls()) # clean environment
 
 ## Load the datasets
-# progresa_pre <- read.csv() insert your filepath etc
-# progresa_post <- read.csv()
+progresa_pre <- read_csv(here("assignments", "data", "progresa_pre_1997.csv")) 
+progresa_post <- read.csv(here("assignments", "data", "progresa_pre_1999.csv")) 
 
 ## Append post to pre dataset 
-#progresa <- rbind(progresa_pre, progresa_post)
-
+progresa <- rbind(progresa_pre, progresa_post)
 ```
 
 a)  Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!) \indent \*\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:\*
@@ -414,24 +436,48 @@ a)  Estimate a first-difference (FD) regression manually, interpret the results 
 ## i. Sort the panel data in the order in which you want to take differences, i.e. by household and time.
 
 ## Create first differences of variables
-# progresa <- progresa %>% 
-#   arrange(hhid, year) %>% 
-#   group_by(hhid)
+progresa <- progresa %>%
+  arrange(hhid, year) %>%
+  group_by(hhid) %>% 
 
 ## ii. Calculate the first difference using the lag function from the dplyr package.
-#     mutate(vani_fd = vani - dplyr::lag(vani)) 
+  mutate(vani_fd = vani - dplyr::lag(vani))
+
 
 ## iii. Estimate manual first-difference regression (Estimate the regression using the newly created variables.)
-# fd_manual <- lm(vani_fd ~ ...)
+fd_manual <- lm(vani_fd ~ treatment, data = progresa)
 
+# print results
+broom::tidy(fd_manual) %>% 
+  kbl(caption = "Q2, pt(a)") %>% 
+  kable_minimal()
 ```
 
 ## Fixed Effects Estimates (2 pts)
 
 b)  Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)
 
-```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60), eval=FALSE}
 ## Fixed Effects Regression
+# remove NAs in treatment colum
+progresa_lite <- progresa %>% 
+  filter(is.na(treatment) == FALSE)
+
+within <- plm(vani ~ treatment,
+              index = c("hhid", "year"),
+              effect = "time",
+              data = progresa)
+
+
+
+summary(within)
+
+
+
+
+# Although in most models the individual and time effects cases are symmetric, there are exceptions: estimating the first-difference model on time effects is meaningless because cross-sections do not generally have a natural ordering, so trying effect = "time" stops with an error message as does effect = "twoways" which is not defined for first-difference models.
+
+
 
 ## Present Regression Results
 ```
