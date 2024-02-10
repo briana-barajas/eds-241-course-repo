@@ -459,7 +459,7 @@ broom::tidy(fd_manual) %>%
 
 b) **Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)**
 
-```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60), eval=FALSE}
+```{r}
 ## Fixed Effects Regression
 # remove NAs in treatment colum
 within <- plm(vani ~ treatment,
@@ -468,12 +468,12 @@ within <- plm(vani ~ treatment,
               data = progresa)
 
 # present regression results 
-broom::tidy(within) %>% 
-  kbl() %>% 
+within_tbl <- broom::tidy(within)
+within_tbl %>% kbl(caption = "Fixed Effects Regression Estimate (2b)") %>% 
   kable_minimal()
 ```
 
-**ANS:** The coefficient calculated in the fixed effects regressions is likely negative because the order of subtraction was switched, with this in mind I will be comparing a positive 231 difference to the estimate of 287 calculated before (2a). For the fixed effects model, we see a smaller change in the difference in `vani` based on treatment. Although the value of the coefficient is different, it is still statistically significant. This means that the average difference in `vani` between 1997 and 1999 was 231 for treated groups.
+**ANS:** The coefficient calculated in the fixed effects regressions (**Table 10**) is likely negative because the order of subtraction was switched, with this in mind I will be comparing a positive 231 difference to the estimate of 287 calculated before (2a). For the fixed effects model, we see a smaller change in the difference in `vani` based on treatment. Although the value of the coefficient is different, it is still statistically significant. This means that the average difference in `vani` between 1997 and 1999 was 231 for treated groups.
 
 \indent
 ## First Difference and Fixed Effects and Omitted Variable Problems (1 pts)
