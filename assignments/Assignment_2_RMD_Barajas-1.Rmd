@@ -263,7 +263,6 @@ covariate_balance <- xBalance(tobacco ~ anemia + diabete +
 
 # print results in neat balance table
 tidy.xbal(covariate_balance) %>% 
-  select(-NA.info) %>% 
   kbl(caption = "Covariate Model Balance Table (1b)") %>% kable_minimal()
 ```
 
@@ -342,11 +341,12 @@ histbackback(split(match_bw_df$psvalue, match_bw_df$tobacco),
 
 ```
 
-**ANS:** 
+**ANS:** After conducting nearest neighbor matching, the standardized difference values (std.diff) have moved closer to 0 (compare matched **Table 7** to unmatched Table 5). The change in standardized difference values indicates that the matching was successful, and the additional covariates were matching in a way that will allow us to isolate the impact that the treatment has on birth weight. The updated histograms in **Figure 2** displays a similar result. The improvement in the histograms indicates that the matching process led to changes in the propensity scores that improved balance between groups. 
 
+\indent
 ## ATT with Nearest Neighbor (3 pts)
 
-(e) Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)
+(e) **Estimate the ATT using the matched dataset. Report and interpret your result (Note: no standard error or significance test is required here)**
 
 ```{r , include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 
@@ -368,22 +368,12 @@ paste("Estimate of ATT using matched dataset:", ATT_nn)
 
 ```
 
-**NOTE:** The ATT is similar to the measure of ATE we conducted in part 1a, where the difference in means between smoking and non-smoking mothers 222 grams. This value is only slightly smaller than the mean difference in birth weight of unmatched mothers. Since this data was matched, we can see that smoking has a large impact on birth weight even when other factors (education, first, alcohol, etc.) are held constant.
+__ANS:__ The average treatment effect on the treated (ATT) is similar to the average treatment effect (ATE) that was conducted in Question 1a. In this case, the ATT demonstrates that when mother's smoke, their babies weigh 222 grams less on average. This value is only slightly smaller than the mean difference in birth weight of unmatched mothers. Since the ATT was calculated using matched data, we can see that smoking has a large impact on birth weight even when other factors (education, first, alcohol, etc.) are held constant.
+
 
 ## ATE with WLS Matching (3 pts)
 
-f)  Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.
-
-```{r , include=TRUE, results='asis', tidy=TRUE, tidy.opts=list(width.cutoff=60)}
-## Weighted least Squares (WLS) estimator Preparation
-
-
-## Weighted least Squares (WLS) Estimates
-
-
-## Present Results
-
-```
+f)  **Last, use the original dataset and perform the weighted least squares estimation of the ATE using the propensity scores (including controls). Report and interpret your results, here include both size and precision of estimate in reporting and interpretation.**
 
 ```{r}
 # preliminary calculations for weighted least squares (WLS)
@@ -399,13 +389,17 @@ wls <- lm(birthwgt ~ tobacco + anemia + diabete + alcohol + mblack + first + mag
 
 # print results
 broom::tidy(summary(wls)) %>% 
-  kbl() %>% kable_minimal()
+  kbl(caption = "Weighted Least Squares Regression (1f)") %>% kable_minimal()
 
 ```
+**ANS:** The coefficient estimates in **Table 8** represent the estimated effects of each variable on birth weight, while holding all other variables constant. This is different than the previous regressions because the coefficients are influenced by the weights assigned to each observation. For example, after accounting for differences in the weighting of observations, it is estimated that smoking causes an estimated decreases of -244 grams when all other variables are held constant. The `tobacco` variable also has a low standard error, indicating high certainty for this estimate. 
 
+\indent 
 ## Differences in Estimates (1 pts)
 
-g)  Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?
+g)  **Explain why it was to be expected given your analysis above that there is a difference between your estimates in e) and f)?**
+
+**ANS:** The estimated coefficient for tobacco is slightly more negative for the weighted least square estimate (f) compared to the ATT (1). This occurs because the WLS model makes adjustments for all covariates included in the model. The more negative value indicates that smoking is more strongly associated with decrease in birth weight once the covariates are weighted.
 
 \newpage
 
@@ -434,7 +428,7 @@ progresa <- rbind(progresa_pre, progresa_post)
 ```
 
 
-a)  Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!) \indent \*\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:\*
+a)  **Estimate a first-difference (FD) regression manually, interpret the results briefly (size of coefficient and precision!) \indent \*\*Note: Calculate the difference between pre- and post-program for each individual and for each variable used (i.e the outcome and the independent variables).[3 pts] To do that, follow these steps and the code given in the R-template:\* **
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
 ### Code included to help get you started
@@ -458,9 +452,12 @@ broom::tidy(fd_manual) %>%
   kable_minimal()
 ```
 
+**ANS:** The results of the first difference regression and displayed in **Table 9**. On average, households that received the treatment experienced a 287-unit difference in their `vani_fd` values compared to households that did not receive the subsidy. `vani_fd` represents the difference in `vani` between 1997 and 1999. The p-value for the coefficient is statistically significant (p-value < 0.05), meaning the difference in `vani_fd` between treated and non-treated households is also significant. 
+
+\indent
 ## Fixed Effects Estimates (2 pts)
 
-b)  Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)
+b) **Now also run a fixed effects (FE or 'within') regression and compare the results. Interpret the estimated treatment effects briefly (size of coefficient and precision!)**
 
 ```{r, include=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=60), eval=FALSE}
 ## Fixed Effects Regression
@@ -476,6 +473,11 @@ broom::tidy(within) %>%
   kable_minimal()
 ```
 
+**ANS:** The coefficient calculated in the fixed effects regressions is likely negative because the order of subtraction was switched, with this in mind I will be comparing a positive 231 difference to the estimate of 287 calculated before (2a). For the fixed effects model, we see a smaller change in the difference in `vani` based on treatment. Although the value of the coefficient is different, it is still statistically significant. This means that the average difference in `vani` between 1997 and 1999 was 231 for treated groups.
+
+\indent
 ## First Difference and Fixed Effects and Omitted Variable Problems (1 pts)
 
 c)  Explain briefly how the FD and FE estimator solves a specific omitted variable problem? Look at the example on beer tax and traffic fatalities from class to start thinking about ommitted variables. Give an example of a potential omitted variable for the example we are working with here that might confound our results? For that omitted variable, is a FE or FD estimator better? One example is enough.
+
+**ANS:** The first difference and fixed effects models work by preventing time from causing omitted variable bias. Between two different years, the values of specific animals may very greatly depending on supply and demand, disease outbreaks, or other cultural factors. Any factor that changes the value of the animals over time has the potential to cause omitted variable bias. By holding time constant, we can indirectly account for variables such as market changes that affect `vani`. Let's say two households have nearly equivalent values for `vani` in 1997, but household A has more sheep, and household B has more cows. Say there is a cold-spell, and wool sales increase well into 1999, increasing the value of `vani` for household A. In this example, the fixed effects estimator considers each household separately, so it accounts for the fact that A and B have different types of animals. The FD estimator can be useful for looking in changes over time, but would not properly account for the livestock differences between household A and B.
