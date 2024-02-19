@@ -15,12 +15,15 @@ header-includes:
 Make sure to read through the setup in markdown. Remember to write out interpretations and report your results in writing/table/plot forms.
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE,
+                      fig.width = 4, fig.height = 3)
 ```
 
 ```{r, include=FALSE, results='hide'}
 # clean environment
 rm(list=ls())
+
+options(scipen=999)
 
 # load packages
 library(MatchIt)    # required for assignment
@@ -81,6 +84,11 @@ fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>%
 
 ## Remember to include histograms in final product
 
+fish %>% 
+  pivot_longer(cols = 1:6, names_to = "ecosystem_type",
+               values_to = "value") %>% 
+  ggplot(aes(x = ecosystem_type, y = value)) +
+  geom_col()
 ```
 
 ```{r}
@@ -88,7 +96,7 @@ fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>%
 prop_scores_fish <- glm(itq ~ met1 + met2 + met3 + met4 + met5 + met6, data = fish,family = binomial())
 
 # add ps-value column
-fish <- fish_raw %>% 
+fish <- fish %>% 
   mutate(psvalue = predict(prop_scores_fish, type = "response"))
 
 # plot histogram to compare covariates
@@ -96,23 +104,38 @@ histbackback(split(fish$psvalue, fish$itq))
 
 ```
 
-```{r, eval=FALSE}
-fish %>% 
-  pivot_longer(cols = 1:6,
-               names_to = "met_name",
-               values_to = "met_val") %>% 
-  histbackback(split(fish$met_name, fish$itq))
-```
-
 
 ## Pretreatment Ecosystem Characteristic Comparison, Mean differences *3 pts)*
 
-(b) Do a test on mean differences between the treated and control groups for the species richness index (IND_SR) and commercial value (COMM_VAL) variables. Interpret the results (estimated difference and significance) [2 pts] and make a conclusion regarding the similarity between the groups [1pt].
+(b) Do a test on mean differences between the treated and control groups for the species richness index (`IND_SR`) and commercial value (`COMM_VAL`) variables. Interpret the results (estimated difference and significance) [2 pts] and make a conclusion regarding the similarity between the groups [1pt].
 
-```{r , include=TRUE}
+```{r}
 ## Mean Differences (remember to use prop.test or t.test when applicable)
 
+# calculate differences in mean for sp richness 
+mean_diff_ind <- broom::tidy(
+  t.test(ind_sr ~ itq, data = fish)) %>% 
+  select(estimate1, estimate2, p.value) %>% 
+  mutate(Variable = "ind_sr")
+
+# calculate differences in mean for commercial value 
+mean_diff_comm <- broom::tidy(
+  t.test(comm_val ~ itq, data = fish)) %>% 
+  select(estimate1, estimate2, p.value) %>% 
+  mutate(Variable = "comm_val")
+
+# bind result tables
+t_test_results <- rbind(mean_diff_ind, mean_diff_comm) %>% 
+  relocate(Variable)
+
+# print results
+t_test_results %>% 
+  kbl(col.names = c("Variable", "Mean Treated", "Mean Control", "P-Value"),
+caption = "Mean differences of Treatment vs. Control (1b)") %>% 
+  kable_paper()
+
 ```
+**ANS:** A t-test was used to compare the difference in the means for the variables of interest, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`.
 
 ## Treatment Ignorability *(1 pt)*
 
@@ -195,7 +218,7 @@ rm(progresa_pre_1997, progresa_post_1999) # clean unused data
 ## Estimate ATE with DiD estimator manually. 
 # You will need to calculate various means to get this estimate
 
-              
+
 ## Compute the Difference-in-Differences
 
 ```
