@@ -70,8 +70,14 @@ The basic question of interest is "What is the average treatment effect of imple
 
 ```{r , include=TRUE, results='hide'}
 ## Load Data
-fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>% 
+fish_raw <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>% 
   clean_names()
+
+# pivot data 
+fish <- fish_raw %>% 
+  pivot_longer(cols = 1:6, names_to = "ecosystem_type", values_to = "value") %>% 
+  mutate(ecosystem_type = as.factor(ecosystem_type)) %>% 
+  filter(value == 1)
 ```
 
 ## Pretreatment Ecosystem Characteristic Comparison, Visual *(3 pts)*
@@ -84,25 +90,47 @@ fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>%
 
 ## Remember to include histograms in final product
 
-fish %>% 
-  pivot_longer(cols = 1:6, names_to = "ecosystem_type",
-               values_to = "value") %>% 
-  ggplot(aes(x = ecosystem_type, y = value)) +
-  geom_col()
 ```
 
-```{r}
+```{r, eval=FALSE}
+# ATTEMPT 1 - Calculate prop scores and use histback like in assignment 2
 # calculate propensity scores 
-prop_scores_fish <- glm(itq ~ met1 + met2 + met3 + met4 + met5 + met6, data = fish,family = binomial())
+prop_scores_fish <- glm(itq ~ met1 + met2 + met3 + met4 + met5 + met6, data = fish_raw,family = binomial())
 
 # add ps-value column
-fish <- fish %>% 
+fish_raw <- fish_raw %>% 
   mutate(psvalue = predict(prop_scores_fish, type = "response"))
 
 # plot histogram to compare covariates
-histbackback(split(fish$psvalue, fish$itq))
-
+histbackback(split(fish_raw$psvalue, fish_raw$itq))
 ```
+
+```{r, eval=FALSE}
+# ATTEMPT 5 - Lengthen df 
+fish_long_prop <- glm(itq ~ ecosystem_type, data = fish, family = binomial())
+
+fish$psvalue = predict(fish_long_prop, type = "response")
+
+histbackback(split(fish$psvalue, fish$itq))
+```
+
+
+```{r}
+# ATTEMPT 4 - Pivot longer and create subsets to create mirrored plot of met count
+fish_treat <- fish %>% filter(itq == 1)
+fish_control <- fish %>% filter(itq == 0)
+
+ggplot() +
+  geom_col(data = fish_treat, aes(x = ecosystem_type, y = value), fill = "#2a9d8f") +
+  geom_col(data = fish_control, aes(x = ecosystem_type, y = -value), fill = "#264653") +
+  scale_y_continuous(n.breaks = 10) + 
+  coord_flip() +
+  theme_minimal() +
+  labs(y = "Control                                Treatment", 
+       x = "Marine Ecosystem Distribution")
+```
+
+**ANS:** The distribution for ecosystem types in the control and treatment groups (based on `itq`) mirror each other closely, but not perfectly. For example, in `met5` and `met4` there appear to be more observations for the treatment group. 
 
 
 ## Pretreatment Ecosystem Characteristic Comparison, Mean differences *3 pts)*
@@ -131,15 +159,18 @@ t_test_results <- rbind(mean_diff_ind, mean_diff_comm) %>%
 # print results
 t_test_results %>% 
   kbl(col.names = c("Variable", "Mean Treated", "Mean Control", "P-Value"),
-caption = "Mean differences of Treatment vs. Control (1b)") %>% 
+      caption = "Mean differences of Treatment vs. Control (1b)") %>% 
   kable_paper()
 
 ```
-**ANS:** A t-test was used to compare the difference in the means for the variables of interest, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`.
+**ANS:** A t-test was used to compare the difference in the means for the variables of interest, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`. 
 
 ## Treatment Ignorability *(1 pt)*
 
 (c) Based on your results from (a) and (b), do you see a problem with just comparing the outcome variable means between treated and untreated fisheries?
+
+**ANS:** Based on the histogram from *Question 1a*, there appears to be differences in the marine ecosystem type (`met`) of the control group versus the treatment. This would cause bias when statistically estimating whether or not regulation by an Individual Transferable Quota (ITQ) altered the share of years a fishery collapsed (`coll_share`), Similarly the t-test results above demonstrate that the difference in the mean species richness index (`ind_sr`) and commercial value (`comm_val`) are statistically significant. This adds to the potential for bias, since all pre-treatment characteristics vary for the treated and untreated. 
+
 
 ## Propensity Scores *(2 pts)*
 
@@ -149,6 +180,18 @@ caption = "Mean differences of Treatment vs. Control (1b)") %>%
 ## Propensity Score Estimates
 
 ```
+
+```{r}
+propensity_scores <- glm(itq ~ ecosystem_type + comm_val + ind_sr, data = fish, family = binomial())
+
+fish <- fish %>% 
+  select(-value) %>% 
+  mutate(psvalue = predict(propensity_scores, type = "response"))
+
+histbackback(split(fish$psvalue, fish$itq))
+```
+
+**ANS:** Based on the previous questions, the resulting histogram is expected but not ideal for our analysis. There is very little overlap, meaning ...
 
 ## ATT with Nearest Neighbor Matching *(3 pts: 2 pt estimate, 1 pt interpretation)*
 
