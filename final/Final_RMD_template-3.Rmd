@@ -239,7 +239,7 @@ wls_ctrl_results %>%
 
 # Part 2 Difference in Difference Estimation *(10 points total + 3pts extra credit)*
 
-\indent Here we return for a final time to the dataset from Gertler, Martinez, and Rubio-Codina (2012) and use a different way of estimating the effect of the Mexican conditional cash transfer on the value of animal holdings of recipients. We'll use the panel data from assignment 2, where you have both the pre-program and post-program observations. See Template for dataset preparation instructions.
+\indent Here we return for a final time to the dataset from Gertler, Martinez, and Rubio-Codina (2012) and use a different way of estimating the **effect of the Mexican conditional cash transfer on the value of animal holdings** of recipients. We'll use the panel data from assignment 2, where you have both the pre-program and post-program observations. See Template for dataset preparation instructions.
 
 
 
@@ -252,28 +252,31 @@ Prepare Data: Load the new data (progresa_pre_1997.csv) and the follow-up data (
 ```{r , include=TRUE, echo=FALSE}
 rm(list=ls()) # clean environment
 
-## Load/Prep Data
-# How I setup my coding flow
-# Keep project WD, set extension to get data from google drive 
-# data_wd <- "/Users/elliottfinn/Library/CloudStorage/GoogleDrive-elliottfinn@ucsb.edu/Shared drives/EDS241/Assignments/Assignment 2"
+library(tidyverse)
+library(plm)
+library(here)
 
 # Load 1997 and 1999 Progresa datasets
+progresa_post_1999 <- read_csv(here("final", "data", "progresa_post_1999.csv"))
+progresa_pre_1997 <- read_csv(here("final", "data", "progresa_pre_1997.csv"))
+
 
 ####### CODE FIX FOR FINAL ######
 
 ### Append post to pre dataset 
-# progresa_full <- rbind(progresa_pre_1997, progresa_post_1999) # same as original
-#(note, you can keep NAs in the data- they'll be excluded from any estimates etc)
-#progresa_full <- progresa_full %>%
-#  group_by(hhid) %>% filter(n() == 2) %>%
-#  ungroup()
+progresa_full <- rbind(progresa_pre_1997, progresa_post_1999) # same as original
+
+# (note, you can keep NAs in the data- they'll be excluded from any estimates etc)
+progresa_full <- progresa_full %>%
+ group_by(hhid) %>% filter(n() == 2) %>%
+ ungroup()
+
 # This removes all families lost to attrition, 
 # in other words. Families who were treated/controls in the program, but did not get measured
 # in the second year. This can happen for many reasons with observational data, you often
 # lose participants as studies go on for longer periods of time.
 
 rm(progresa_pre_1997, progresa_post_1999) # clean unused data
-
 ```
 
 ## DiD Estimator, ATE *(5 pts: 3 pts estimate, 2 pts interpretation)*
@@ -289,6 +292,37 @@ rm(progresa_pre_1997, progresa_post_1999) # clean unused data
 ## Compute the Difference-in-Differences
 
 ```
+
+```{r}
+# calculate mean vani
+
+# between 1981 and 1979
+# Did = (1981_value_treat - 1979_value_treat) - (1981_value_ctrl = 1979_value_ctrl)
+# years = 1981, 1979
+# value = Hispanics
+# treat = in Miami, after Mariel
+# control = other cities
+
+# calculate mean vani for treatment and control, both years
+diff <- progresa_full %>% 
+  filter(treatment == 1 | treatment == 0) %>% # remove NAs for treatment
+  
+  group_by(year, treatment) %>%  
+  summarise(mean_vani = mean(vani, na.rm = TRUE)) %>% # calculate mean vani for year+treatment
+  
+  ungroup() %>%
+  group_by(treatment) %>%
+  mutate(diff_1999_97 = mean_vani - dplyr::lag(mean_vani))  #calculate mean differences 
+  
+# calculate did
+did <- diff %>% ungroup() %>% 
+  drop_na(diff_1999_97) %>% 
+  mutate(did = diff_1999_97 - dplyr::lag(diff_1999_97))
+
+glue::glue("Difference-in-difference estimator:", as.numeric(did[2,5]))
+
+```
+**ANS:** The average treatment effect, standardized for changes over time using the difference-in-difference estimator, is 287.9 pesos. This indicates that, on average, households that underwent treatment saw an increase of 287.9 pesos in their value of animal holdings (`vani`).
 
 ## Difference in Difference using OLS *(5 pts)*
 
