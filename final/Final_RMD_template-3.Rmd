@@ -66,15 +66,15 @@ This exercise is inspired by Costello et al. 2008 article in science "Can Catch 
 
 \indent `COMM_VAL` = Commercial value of fisheries in 1980 in million US-\$
 
-The basic question of interest is "What is the average treatment effect of implementing an ITQ in the time period from 1990 to 2012 on the share of years with a collapse. It is likely that the probability a fishery is selected for an ITQ depends on the pre-treatment characteristics given. It is also quite likely that the pre-treatment characteristics have an effect on the share of collapse for each fishery, i.e. our outcome variable of interest.
+The basic question of interest is **"What is the average treatment effect of implementing an ITQ in the time period from 1990 to 2012 on the share of years with a collapse.** It is likely that the probability a fishery is selected for an ITQ depends on the pre-treatment characteristics given. It is also quite likely that the pre-treatment characteristics have an effect on the share of collapse for each fishery, i.e. our outcome variable of interest.
 
 ```{r , include=TRUE, results='hide'}
 ## Load Data
-fish_raw <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>% 
+fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>% 
   clean_names()
 
 # pivot data 
-fish <- fish_raw %>% 
+fish_pivot <- fish %>% 
   pivot_longer(cols = 1:6, names_to = "ecosystem_type", values_to = "value") %>% 
   mutate(ecosystem_type = as.factor(ecosystem_type)) %>% 
   filter(value == 1)
@@ -117,8 +117,8 @@ histbackback(split(fish$psvalue, fish$itq))
 
 ```{r}
 # ATTEMPT 4 - Pivot longer and create subsets to create mirrored plot of met count
-fish_treat <- fish %>% filter(itq == 1)
-fish_control <- fish %>% filter(itq == 0)
+fish_treat <- fish_pivot %>% filter(itq == 1)
+fish_control <- fish_pivot %>% filter(itq == 0)
 
 ggplot() +
   geom_col(data = fish_treat, aes(x = ecosystem_type, y = value), fill = "#2a9d8f") +
@@ -130,7 +130,7 @@ ggplot() +
        x = "Marine Ecosystem Distribution")
 ```
 
-**ANS:** The distribution for ecosystem types in the control and treatment groups (based on `itq`) mirror each other closely, but not perfectly. For example, in `met5` and `met4` there appear to be more observations for the treatment group. 
+**ANS:** I decided to pivot the data frame so marine ecosystem type would be a single column, making it easier to compare the treatment and control groups. The distribution for ecosystem types in the control and treatment groups (where treatment is `itq`) are not equal. For example, in `met5` and `met4` there appear to be more observations for the treatment group.
 
 
 ## Pretreatment Ecosystem Characteristic Comparison, Mean differences *3 pts)*
@@ -163,13 +163,13 @@ t_test_results %>%
   kable_paper()
 
 ```
-**ANS:** A t-test was used to compare the difference in the means for the variables of interest, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`. 
+**ANS:** A t-test was used to compare the difference in the means for the continuous variables, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`. 
 
 ## Treatment Ignorability *(1 pt)*
 
 (c) Based on your results from (a) and (b), do you see a problem with just comparing the outcome variable means between treated and untreated fisheries?
 
-**ANS:** Based on the histogram from *Question 1a*, there appears to be differences in the marine ecosystem type (`met`) of the control group versus the treatment. This would cause bias when statistically estimating whether or not regulation by an Individual Transferable Quota (ITQ) altered the share of years a fishery collapsed (`coll_share`), Similarly the t-test results above demonstrate that the difference in the mean species richness index (`ind_sr`) and commercial value (`comm_val`) are statistically significant. This adds to the potential for bias, since all pre-treatment characteristics vary for the treated and untreated. 
+**ANS:** Based on the histogram from *Question 1a*, there appears to be differences in the marine ecosystem type (`met`) of the control group versus the treatment. This would cause bias when statistically estimating whether or not regulation by an Individual Transferable Quota (ITQ) altered the share of years a fishery collapsed (`coll_share`). Similarly the t-test results above demonstrate that the difference in the mean species richness index (`ind_sr`) and commercial value (`comm_val`) are statistically significant. This adds to the potential for bias, since pre-treatment characteristics vary for the treated and untreated. 
 
 
 ## Propensity Scores *(2 pts)*
@@ -181,21 +181,31 @@ t_test_results %>%
 
 ```
 
-```{r}
-propensity_scores <- glm(itq ~ ecosystem_type + comm_val + ind_sr, data = fish, family = binomial())
 
-fish <- fish %>% 
-  select(-value) %>% 
-  mutate(psvalue = predict(propensity_scores, type = "response"))
+```{r}
+propensity_scores <- glm(itq ~ met1 + met2 +met3 + met4 + met5 + met6 +
+                           ind_sr + comm_val, data = fish, family = binomial())
+
+fish$psvalue <- predict(propensity_scores, type = "response")
 
 histbackback(split(fish$psvalue, fish$itq))
+
+fish %>% 
+  mutate(itq = as.factor(itq)) %>% 
+  ggplot(aes(x = psvalue, fill = itq)) +
+  geom_histogram(alpha = 0.6, position = "identity") +
+  scale_fill_manual(values = c("mediumpurple1", "palevioletred1")) +
+  theme_minimal()
+
 ```
 
-**ANS:** Based on the previous questions, the resulting histogram is expected but not ideal for our analysis. There is very little overlap, meaning ...
+
+**ANS:** There is a decent amount of overlap for the center values, so matching should work. I am a bit concerned about the observations on the more extreme ends. For example, there are many observations in the treated group with a value around 1, but there are not many counterfactuals.
+
 
 ## ATT with Nearest Neighbor Matching *(3 pts: 2 pt estimate, 1 pt interpretation)*
 
-(e) Use the propensity scores from (c) to estimate the Average Treatment Effect on the Treated (ATT) with a nearest neighbor matching estimator. Interpret the result (just the size of the estimate)
+(e) Use the propensity scores from (d) to estimate the Average Treatment Effect on the Treated (ATT) with a nearest neighbor matching estimator. Interpret the result (just the size of the estimate)
 
 ```{r , include=TRUE}
 ## Nearest Neighbor Matching
@@ -203,6 +213,29 @@ histbackback(split(fish$psvalue, fish$itq))
 ## Estimate ATT
 
 ```
+
+```{r}
+# find matches using nearest-neighbors method
+match_itq <- matchit(itq ~  met1 + met2 +met3 + met4 + met5 + met6 +
+                           ind_sr + comm_val, data = fish,
+                     method = "nearest", ratio = 1)
+
+# store results
+match_itq_df <- match.data(match_itq)
+
+# calculate the difference by subgroup
+subgroup_diff <- match_itq_df %>% 
+  group_by(subclass) %>% 
+  mutate(diff = mean(coll_share[itq == 1]) - mean(coll_share[itq == 0]),
+         .groups = "drop")
+
+# calculate the mean for all differences of aTT
+ATT <- mean(subgroup_diff$diff)
+
+paste("Estimate of ATT using matched dataset:", ATT)
+```
+
+**ANS:** The average treatment effect, -0.0713, indicates the difference in the proportion of years that a fishery was collapsed (between 1990-2012). On average, fisheries in the treated group were collapsed for fewer years than the control group.
 
 ## ATE with WLS *(3 pts: 1 pt estimate, 1 pt interpretation)*
 
@@ -215,6 +248,11 @@ histbackback(split(fish$psvalue, fish$itq))
 
 ```
 
+```{r}
+
+```
+
+
 # Part 2 Difference in Difference Estimation *(10 points total + 3pts extra credit)*
 
 \indent Here we return for a final time to the dataset from Gertler, Martinez, and Rubio-Codina (2012) and use a different way of estimating the effect of the Mexican conditional cash transfer on the value of animal holdings of recipients. We'll use the panel data from assignment 2, where you have both the pre-program and post-program observations. See Template for dataset preparation instructions.
@@ -226,7 +264,7 @@ histbackback(split(fish$psvalue, fish$itq))
 Prepare Data: Load the new data (progresa_pre_1997.csv) and the follow-up data (progresa_post_1999.csv) into R. Note that we created a time denoting variable (with the same name, 'year') in BOTH datasets. Again, you will create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of family animal holdings (vani). You will use the full dataset for each estimate. NOTE: you should not change any NAs from the TREATED column in your analysis, as we expect that spillover was likely in this program. NAs will be excluded from your calculations/estimations.
 
 ```{r , include=TRUE, echo=FALSE}
-rm(list=ls()) # clean environment
+#rm(list=ls()) # clean environment
 
 ## Load/Prep Data
 # How I setup my coding flow
