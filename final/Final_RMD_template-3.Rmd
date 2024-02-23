@@ -84,42 +84,12 @@ fish_pivot <- fish %>%
 
 (a) Compare the distributions of pre-treatment ecosystem characteristics (i.e. MET1, MET2, ,,, MET6) between the treated and the control groups by drawing back to back histograms [2 pts]. Write one sentence discussing the (dis)similarity between the two groups [1pt].
 
-```{r , include=TRUE}
-## Histograms comparing covariates
-
-
-## Remember to include histograms in final product
-
-```
-
-```{r, eval=FALSE}
-# ATTEMPT 1 - Calculate prop scores and use histback like in assignment 2
-# calculate propensity scores 
-prop_scores_fish <- glm(itq ~ met1 + met2 + met3 + met4 + met5 + met6, data = fish_raw,family = binomial())
-
-# add ps-value column
-fish_raw <- fish_raw %>% 
-  mutate(psvalue = predict(prop_scores_fish, type = "response"))
-
-# plot histogram to compare covariates
-histbackback(split(fish_raw$psvalue, fish_raw$itq))
-```
-
-```{r, eval=FALSE}
-# ATTEMPT 5 - Lengthen df 
-fish_long_prop <- glm(itq ~ ecosystem_type, data = fish, family = binomial())
-
-fish$psvalue = predict(fish_long_prop, type = "response")
-
-histbackback(split(fish$psvalue, fish$itq))
-```
-
-
 ```{r}
-# ATTEMPT 4 - Pivot longer and create subsets to create mirrored plot of met count
+# create subset of treated and untreated
 fish_treat <- fish_pivot %>% filter(itq == 1)
 fish_control <- fish_pivot %>% filter(itq == 0)
 
+# plot to compare distribution of ecosystem types 
 ggplot() +
   geom_col(data = fish_treat, aes(x = ecosystem_type, y = value), fill = "#2a9d8f") +
   geom_col(data = fish_control, aes(x = ecosystem_type, y = -value), fill = "#264653") +
@@ -176,26 +146,16 @@ t_test_results %>%
 
 (d) Estimate the propensity scores (probability of being treated) using a logit model, assume that all covariates are relevant and should be included in the estimation [0.5 pt]. Draw separate histograms (back to back) of the propensity scores for the treated and the untreated group [0.5 pt]. Comment on the overlap, do you have any concerns? Why/why not? [1]
 
-```{r , include=TRUE}
-## Propensity Score Estimates
-
-```
-
 
 ```{r}
+## ...........Propensity Score Estimates..............
+
 propensity_scores <- glm(itq ~ met1 + met2 +met3 + met4 + met5 + met6 +
                            ind_sr + comm_val, data = fish, family = binomial())
 
 fish$psvalue <- predict(propensity_scores, type = "response")
 
 histbackback(split(fish$psvalue, fish$itq))
-
-fish %>% 
-  mutate(itq = as.factor(itq)) %>% 
-  ggplot(aes(x = psvalue, fill = itq)) +
-  geom_histogram(alpha = 0.6, position = "identity") +
-  scale_fill_manual(values = c("mediumpurple1", "palevioletred1")) +
-  theme_minimal()
 
 ```
 
@@ -207,14 +167,9 @@ fish %>%
 
 (e) Use the propensity scores from (d) to estimate the Average Treatment Effect on the Treated (ATT) with a nearest neighbor matching estimator. Interpret the result (just the size of the estimate)
 
-```{r , include=TRUE}
-## Nearest Neighbor Matching
-
-## Estimate ATT
-
-```
-
 ```{r}
+## ..........Nearest Neighbor Matching................
+
 # find matches using nearest-neighbors method
 match_itq <- matchit(itq ~  met1 + met2 +met3 + met4 + met5 + met6 +
                            ind_sr + comm_val, data = fish,
@@ -229,6 +184,8 @@ subgroup_diff <- match_itq_df %>%
   mutate(diff = mean(coll_share[itq == 1]) - mean(coll_share[itq == 0]),
          .groups = "drop")
 
+## .................Estimate ATT......................
+
 # calculate the mean for all differences of aTT
 ATT <- mean(subgroup_diff$diff)
 
@@ -241,21 +198,50 @@ paste("Estimate of ATT using matched dataset:", ATT)
 
 (f) Estimate the Average Treatment Effect (ATE) using the weighted least squares on the full sample. Interpret the estimated size and conclude if it is significantly different from zero from a statistical perspective.
 
-```{r , include=TRUE}
-## WLS Matching
-
-## Estimate ATE
-
-```
-
 ```{r}
+## ...................WLS Matching.................... 
 
+# isolate variables needed to calculate WLS estimator
+PS <- fish$psvalue
+D <- fish$itq
+
+# calculate weights
+fish <- fish %>% 
+  mutate(wgt = (D/PS + (1-D)/(1-PS)))
+
+fish$wgt = ifelse(D == 1, 
+                  (1 / PS),
+                  (1 / (1 - PS)))
+
+## ................Estimate ATE.......................
+
+# calculate WLS estimate without controls
+fish_wls <- lm(coll_share ~ itq, 
+               data = fish, weights = wgt)
+
+# calculate WLS estimate with controls
+fish_wls_ctrl <- lm(coll_share ~ itq + ind_sr + comm_val + met1 + met2 +
+                 met3 + met4 + met5 + met6, data = fish,
+               weights = wgt)
+
+# store and print results to view ATE
+wls_results <- broom::tidy(fish_wls)
+wls_ctrl_results <- broom::tidy(fish_wls_ctrl)
+
+wls_results %>% 
+  kbl(caption = "WLS Without Controls", digits = 4)
+
+wls_ctrl_results %>% 
+  kbl(caption = "WLS With Controls", digits = 4)
 ```
 
+**ANS:** The estimated average treatment effect (ATE) when using weighted least squares with all control variables is -0.0766 years. This ATE indicates that, on average, there is a decrease of 0.0766 in the proportion of years that a fishery is collapsed. The low p-value (less than 0.05) indicates that the difference in `coll_share` between fisheries with and without individual transferable quotas is significant.
 
 # Part 2 Difference in Difference Estimation *(10 points total + 3pts extra credit)*
 
 \indent Here we return for a final time to the dataset from Gertler, Martinez, and Rubio-Codina (2012) and use a different way of estimating the effect of the Mexican conditional cash transfer on the value of animal holdings of recipients. We'll use the panel data from assignment 2, where you have both the pre-program and post-program observations. See Template for dataset preparation instructions.
+
+
 
 \indent *\*Data Preparation\*\*
 
@@ -264,7 +250,7 @@ paste("Estimate of ATT using matched dataset:", ATT)
 Prepare Data: Load the new data (progresa_pre_1997.csv) and the follow-up data (progresa_post_1999.csv) into R. Note that we created a time denoting variable (with the same name, 'year') in BOTH datasets. Again, you will create a panel dataset by appending the data (i.e. binding the dataset row-wise together creating a single dataset). We want to examine the same outcome variable as before, value of family animal holdings (vani). You will use the full dataset for each estimate. NOTE: you should not change any NAs from the TREATED column in your analysis, as we expect that spillover was likely in this program. NAs will be excluded from your calculations/estimations.
 
 ```{r , include=TRUE, echo=FALSE}
-#rm(list=ls()) # clean environment
+rm(list=ls()) # clean environment
 
 ## Load/Prep Data
 # How I setup my coding flow
