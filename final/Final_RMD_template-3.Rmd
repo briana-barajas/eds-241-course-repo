@@ -73,7 +73,7 @@ The basic question of interest is **"What is the average treatment effect of imp
 fish <- read_csv(here("final", "data", "final_fisheries_data.csv")) %>% 
   clean_names()
 
-# pivot data 
+# pivot data (turn met into single column)
 fish_pivot <- fish %>% 
   pivot_longer(cols = 1:6, names_to = "ecosystem_type", values_to = "value") %>% 
   mutate(ecosystem_type = as.factor(ecosystem_type)) %>% 
@@ -97,11 +97,12 @@ ggplot() +
   coord_flip() +
   theme_minimal() +
   labs(y = "Control                                Treatment", 
-       x = "Marine Ecosystem Distribution")
+       x = "Marine Ecosystem Distribution",
+       title = "Distribution of Marine Ecosystem Types (1a)") + 
+  theme(plot.title = element_text(size = 12))
 ```
 
-**ANS:** I decided to pivot the data frame so marine ecosystem type would be a single column, making it easier to compare the treatment and control groups. The distribution for ecosystem types in the control and treatment groups (where treatment is `itq`) are not equal. For example, in `met5` and `met4` there appear to be more observations for the treatment group.
-
+**ANS 1A:** I decided to pivot the data frame so marine ecosystem type would be a single column, making it easier to compare the treatment and control groups. The distribution for ecosystem types in the control and treatment groups (where treatment is `itq`) are not equal. For example, in `met5` and `met4` there appear to be more observations for the treatment group.
 
 ## Pretreatment Ecosystem Characteristic Comparison, Mean differences *3 pts)*
 
@@ -133,19 +134,18 @@ t_test_results %>%
   kable_paper()
 
 ```
-**ANS:** A t-test was used to compare the difference in the means for the continuous variables, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`. 
+
+**ANS 1B:** A t-test was used to compare the difference in the means for the continuous variables, and both tests resulted in a p-value that was less than 0.05. Given a significance level (${\alpha}$) of 0.05, we can reject the null hypothesis that the difference in means between the control group and treatment group equals zero. This is true for both `ind_sr` and `comm_val`.
 
 ## Treatment Ignorability *(1 pt)*
 
 (c) Based on your results from (a) and (b), do you see a problem with just comparing the outcome variable means between treated and untreated fisheries?
 
-**ANS:** Based on the histogram from *Question 1a*, there appears to be differences in the marine ecosystem type (`met`) of the control group versus the treatment. This would cause bias when statistically estimating whether or not regulation by an Individual Transferable Quota (ITQ) altered the share of years a fishery collapsed (`coll_share`). Similarly the t-test results above demonstrate that the difference in the mean species richness index (`ind_sr`) and commercial value (`comm_val`) are statistically significant. This adds to the potential for bias, since pre-treatment characteristics vary for the treated and untreated. 
-
+**ANS 1C:** Based on the histogram from *Question 1a*, there appears to be differences in the marine ecosystem type (`met`) of the control group versus the treatment. This would cause bias when statistically estimating whether or not regulation by an Individual Transferable Quota (ITQ) altered the share of years a fishery collapsed (`coll_share`). Similarly the t-test results above demonstrate that the difference in the mean species richness index (`ind_sr`) and commercial value (`comm_val`) are statistically significant. This adds to the potential for bias, since pre-treatment characteristics vary for the treated and untreated.
 
 ## Propensity Scores *(2 pts)*
 
 (d) Estimate the propensity scores (probability of being treated) using a logit model, assume that all covariates are relevant and should be included in the estimation [0.5 pt]. Draw separate histograms (back to back) of the propensity scores for the treated and the untreated group [0.5 pt]. Comment on the overlap, do you have any concerns? Why/why not? [1]
-
 
 ```{r}
 ## ...........Propensity Score Estimates..............
@@ -159,9 +159,7 @@ histbackback(split(fish$psvalue, fish$itq))
 
 ```
 
-
-**ANS:** There is a decent amount of overlap for the center values, so matching should work. I am a bit concerned about the observations on the more extreme ends. For example, there are many observations in the treated group with a value around 1, but there are not many counterfactuals.
-
+**ANS 1D:** There is a decent amount of overlap for the center values, so matching should work. I am a bit concerned about the observations on the more extreme ends. For example, there are many observations in the treated group with a value around 1, but there are not many counterfactuals.
 
 ## ATT with Nearest Neighbor Matching *(3 pts: 2 pt estimate, 1 pt interpretation)*
 
@@ -172,7 +170,7 @@ histbackback(split(fish$psvalue, fish$itq))
 
 # find matches using nearest-neighbors method
 match_itq <- matchit(itq ~  met1 + met2 +met3 + met4 + met5 + met6 +
-                           ind_sr + comm_val, data = fish,
+                       ind_sr + comm_val, data = fish,
                      method = "nearest", ratio = 1)
 
 # store results
@@ -192,7 +190,7 @@ ATT <- mean(subgroup_diff$diff)
 paste("Estimate of ATT using matched dataset:", ATT)
 ```
 
-**ANS:** The average treatment effect, -0.0713, indicates the difference in the proportion of years that a fishery was collapsed (between 1990-2012). On average, fisheries in the treated group were collapsed for fewer years than the control group.
+**ANS 1E:** The average treatment effect, -0.0713, indicates the difference in the proportion of years that a fishery was collapsed (between 1990-2012). On average, fisheries in the treated group were collapsed for fewer years than the control group.
 
 ## ATE with WLS *(3 pts: 1 pt estimate, 1 pt interpretation)*
 
@@ -221,27 +219,25 @@ fish_wls <- lm(coll_share ~ itq,
 
 # calculate WLS estimate with controls
 fish_wls_ctrl <- lm(coll_share ~ itq + ind_sr + comm_val + met1 + met2 +
-                 met3 + met4 + met5 + met6, data = fish,
-               weights = wgt)
+                      met3 + met4 + met5 + met6, data = fish,
+                    weights = wgt)
 
 # store and print results to view ATE
 wls_results <- broom::tidy(fish_wls)
 wls_ctrl_results <- broom::tidy(fish_wls_ctrl)
 
 wls_results %>% 
-  kbl(caption = "WLS Without Controls", digits = 4)
+  kbl(caption = "WLS Without Controls (1f)", digits = 4)
 
 wls_ctrl_results %>% 
-  kbl(caption = "WLS With Controls", digits = 4)
+  kbl(caption = "WLS With Controls (1f)", digits = 4)
 ```
 
-**ANS:** The estimated average treatment effect (ATE) when using weighted least squares with all control variables is -0.0766 years. This ATE indicates that, on average, there is a decrease of 0.0766 in the proportion of years that a fishery is collapsed. The low p-value (less than 0.05) indicates that the difference in `coll_share` between fisheries with and without individual transferable quotas is significant.
+**ANS 1F:** The estimated average treatment effect (ATE) when using weighted least squares with all control variables is -0.0766 years. This ATE indicates that, on average, there is a decrease of 0.0766 in the proportion of years that a fishery is collapsed. The low p-value (less than 0.05) indicates that the difference in `coll_share` between fisheries with and without individual transferable quotas is significant.
 
 # Part 2 Difference in Difference Estimation *(10 points total + 3pts extra credit)*
 
 \indent Here we return for a final time to the dataset from Gertler, Martinez, and Rubio-Codina (2012) and use a different way of estimating the **effect of the Mexican conditional cash transfer on the value of animal holdings** of recipients. We'll use the panel data from assignment 2, where you have both the pre-program and post-program observations. See Template for dataset preparation instructions.
-
-
 
 \indent *\*Data Preparation\*\*
 
@@ -255,6 +251,7 @@ rm(list=ls()) # clean environment
 library(tidyverse)
 library(plm)
 library(here)
+library(kableExtra)
 
 # Load 1997 and 1999 Progresa datasets
 progresa_post_1999 <- read_csv(here("final", "data", "progresa_post_1999.csv"))
@@ -268,8 +265,8 @@ progresa_full <- rbind(progresa_pre_1997, progresa_post_1999) # same as original
 
 # (note, you can keep NAs in the data- they'll be excluded from any estimates etc)
 progresa_full <- progresa_full %>%
- group_by(hhid) %>% filter(n() == 2) %>%
- ungroup()
+  group_by(hhid) %>% filter(n() == 2) %>%
+  ungroup()
 
 # This removes all families lost to attrition, 
 # in other words. Families who were treated/controls in the program, but did not get measured
@@ -283,25 +280,8 @@ rm(progresa_pre_1997, progresa_post_1999) # clean unused data
 
 (a) Calculate the DiD estimator of the treatment effect (ATE) of the program on the value of animal holdings (vani) "manually" i.e. based on group mean values without running a regression. Report and interpret the result (Note: no significance test or standard errors is possible, so you do not need to report these values).
 
-```{r, include=TRUE}
-
-## Estimate ATE with DiD estimator manually. 
-# You will need to calculate various means to get this estimate
-
-
-## Compute the Difference-in-Differences
-
-```
-
 ```{r}
-# calculate mean vani
-
-# between 1981 and 1979
-# Did = (1981_value_treat - 1979_value_treat) - (1981_value_ctrl = 1979_value_ctrl)
-# years = 1981, 1979
-# value = Hispanics
-# treat = in Miami, after Mariel
-# control = other cities
+## ........Calculate means to estimate ATE............
 
 # calculate mean vani for treatment and control, both years
 diff <- progresa_full %>% 
@@ -313,7 +293,10 @@ diff <- progresa_full %>%
   ungroup() %>%
   group_by(treatment) %>%
   mutate(diff_1999_97 = mean_vani - dplyr::lag(mean_vani))  #calculate mean differences 
-  
+
+
+## ................Compute the DiD....................
+
 # calculate did
 did <- diff %>% ungroup() %>% 
   drop_na(diff_1999_97) %>% 
@@ -322,7 +305,8 @@ did <- diff %>% ungroup() %>%
 glue::glue("Difference-in-difference estimator:", as.numeric(did[2,5]))
 
 ```
-**ANS:** The average treatment effect, standardized for changes over time using the difference-in-difference estimator, is 287.9 pesos. This indicates that, on average, households that underwent treatment saw an increase of 287.9 pesos in their value of animal holdings (`vani`).
+
+**ANS 2A:** The average treatment effect, standardized for changes over time using the difference-in-difference estimator, is 287.9 pesos. This indicates that, on average, households that underwent treatment saw an increase of 287.9 pesos in their value of animal holdings (`vani`).
 
 ## Difference in Difference using OLS *(5 pts)*
 
@@ -330,29 +314,68 @@ glue::glue("Difference-in-difference estimator:", as.numeric(did[2,5]))
 
 \indent *\*Hints:\*\* You will need to create a new dataframe with a variety of dummy variables to do this. The R example provided with the DiD module (and/or the excel file) should help.
 
-```{r, include=TRUE}
+```{r}
+## ..........Calculate means for estimate.............
 
-## Create a new data frame for OLS regression
+# create df with vani mean and dummy variables
+group_mean <- progresa_full %>% 
+  filter(treatment == 1 | treatment == 0) %>% 
+  
+  # calculate group means
+  group_by(year, treatment) %>%  
+  summarise(mean_vani = mean(vani, na.rm = TRUE)) %>%
+  ungroup() %>% 
+  
+  # add binary post-treatment column
+  mutate(post_treat = case_when(
+    year == 1999 ~ 1,
+    year == 1997 ~ 0),
+    
+    # add time-treatment interaction column
+    time_x_treated = treatment * post_treat)
 
-## Run the OLS regression w/dummies
+## .................OLS Regression....................
 
-## Report OLS Model results Print the summary of the OLS model
+# run the OLS regression w/dummies
+model1 <- lm(mean_vani ~ treatment + post_treat + time_x_treated, data = group_mean)
 
+## ............Present results in table...............
+
+model1_results <- broom::tidy(model1)
+
+model1_results %>% kbl(caption = "OLS Model - Mean Data (2b)")
 
 ```
+**ANS 2B:** The intercept value indicates that the average value of animal holdings (`vani`) prior to treatment is 2,848 pesos. The `post_treat` estimate can be interpreted as the change in `vani` between pre-treatment and post-treatment time. In this case, between 1997 and 1999 the value of animal holdings decreased by 1156.75 pesos on average. The `treatment` estimate indicates the mean difference in `vani` between the treated and untreated groups, holding all other variables constant. This demonstrates a decrease in `vani` based on treatment, but that would be an incorrect interpretation.
+
+The value we're truly interested in for assessing the average treatment effect is the `time_x_treated` estimate. The `time_x_treated` term estimates the effect of the cash treatment on households, adjusting for time. Therefore, the treatment increased `vani` by an average of 287.9 pesos.
 
 # Extra Credit: ATE with OLS using full dataset *(3 pts: 2 pts estimate, 1 pt interpretation)*
 
 (c) Estimate the ATE with an OLS-regression based on the original units as observations (i.e. not with group mean values, you will need to use the entire dataset). Even though the specification is the same as in the regression with the group mean values above, you'll need to create new indicator variables for the treatment group and the post treatment time period as well as their interaction term. Verify that you get the same result as above. Now report also on the precision of the estimation and test whether the estimated coefficient is different from zero.
 
-```{r, include=TRUE}
-## Create the dummy variables (you'll need 3)
+```{r}
+## .............Create dummy variables................
+progresa_full <- progresa_full %>% 
+  
+  # add dummy variables to full df
+  mutate(post_treat = case_when(
+    year == 1999 ~ 1,
+    year == 1997 ~ 0),
+    
+    time_x_treated = treatment * post_treat) 
 
+## .................OLS Regression....................
 
-## OLS regression
+## conduct regression using dummy variables 
+model2 <- lm(vani ~ treatment + post_treat + time_x_treated, data = progresa_full)
 
+## ............Present results in table...............
 
-# Present Regressions in Table
+# store and print model results
+model2_results <- broom::tidy(model2)
 
-
+model2_results %>% kbl(caption = "OLS Model - Full Data (2c)", digits = 3)
 ```
+**ANS 2C:** The OLS regression with the full data returned the same results as the regression with the mean `vani` values. Using the p-values in the second regression, we can confirm that the interpretations above are statistically significant (p-value < ${alpha}$). More specifically, the difference in `vani` between the treated and untreated, controlling for time is statistically significant. This corresponds to the `time_x_treated` variable, as discussed above.
+
